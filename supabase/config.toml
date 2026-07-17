@@ -1,0 +1,7 @@
+# Supabase local/dev config — used by the Supabase CLI for deploys.
+# Project ref must match VITE_SUPABASE_URL (https://<project-ref>.supabase.co).
+
+project_id = "kmrambclpujmnyxbfkjh"
+
+[functions.send-email]
+verify_jwt = true
