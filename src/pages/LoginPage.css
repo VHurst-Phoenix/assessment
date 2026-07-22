@@ -1,0 +1,32 @@
+/* ── LOGIN PAGE ── */
+
+.login-card {
+  padding: 32px 28px;
+  border-radius: var(--radius);
+  border: 1px solid var(--ivory-dark);
+  background: var(--white);
+  box-shadow: var(--shadow);
+}
+
+.login-error {
+  background: var(--red-light);
+  color: var(--red);
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 20px;
+  border: 1px solid rgba(139, 38, 53, 0.15);
+}
+
+.login-card .form-group input {
+  font-size: 1rem;
+}
+
+.login-card-footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}

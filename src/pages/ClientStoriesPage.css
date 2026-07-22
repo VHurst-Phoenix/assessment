@@ -1,0 +1,236 @@
+/* ── CLIENT STORIES AESTHETICS ── */
+
+.stories-container {
+  max-width: 820px;
+}
+
+.stories-list {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.empty-stories {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.empty-stories p {
+  color: var(--navy);
+  font-family: 'Playfair Display', serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.empty-sub {
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.story-card {
+  border: 1px solid var(--ivory-dark);
+  padding: 36px;
+  position: relative;
+  overflow: hidden;
+}
+
+.story-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 5px;
+  background: var(--gold);
+}
+
+.story-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 28px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--ivory-dark);
+}
+
+.story-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.story-avatar {
+  width: 44px;
+  height: 44px;
+  background: var(--navy);
+  color: var(--gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+  border: 1px solid rgba(212, 160, 86, 0.2);
+}
+
+.story-profile h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 2px;
+}
+
+.story-role {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.story-badge {
+  background: var(--gold-dim);
+  color: var(--gold);
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid rgba(212, 160, 86, 0.15);
+  white-space: nowrap;
+}
+
+/* Timeline Layout */
+.story-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.timeline-block {
+  padding-left: 20px;
+  position: relative;
+}
+
+.timeline-block::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.timeline-block.before::before { background: var(--red); }
+.timeline-block.shift::before { background: var(--gold); }
+.timeline-block.after::before { background: var(--green); }
+
+.timeline-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.timeline-block.before .timeline-label { color: var(--red); }
+.timeline-block.shift .timeline-label { color: var(--navy); }
+.timeline-block.after .timeline-label { color: var(--green); }
+
+.timeline-block p {
+  color: var(--charcoal);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+@media (max-width: 600px) {
+  .story-card {
+    padding: 24px 20px;
+  }
+  
+  .story-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .story-badge {
+    align-self: flex-start;
+  }
+
+  .story-timeline {
+    gap: 28px;
+  }
+
+  .timeline-block {
+    padding-left: 24px;
+  }
+
+  .timeline-block::before {
+    top: 4px;
+    left: 4px;
+  }
+
+  .timeline-label {
+    font-size: 0.68rem;
+    margin-bottom: 8px;
+  }
+
+  .timeline-block p {
+    font-size: 0.92rem;
+    line-height: 1.6;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+}
+
+@media (max-width: 480px) {
+  .story-card {
+    padding: 20px 16px;
+  }
+
+  .story-timeline {
+    gap: 32px;
+  }
+
+  .timeline-block {
+    padding-left: 20px;
+  }
+
+  .timeline-block::before {
+    top: 6px;
+    left: -4px;
+    width: 10px;
+    height: 10px;
+  }
+
+  .timeline-label {
+    font-size: 0.65rem;
+    margin-bottom: 10px;
+    font-weight: 700;
+  }
+
+  .timeline-block p {
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  .story-profile {
+    gap: 10px;
+  }
+
+  .story-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .story-profile h3 {
+    font-size: 1.05rem;
+  }
+
+  .story-role {
+    font-size: 0.8rem;
+  }
+}

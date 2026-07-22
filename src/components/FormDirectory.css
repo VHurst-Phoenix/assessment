@@ -1,0 +1,163 @@
+/* ── FORM DIRECTORY AESTHETICS ── */
+
+.form-directory-section {
+  margin-top: 56px;
+  width: 100%;
+}
+
+.directory-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--ivory-dark), transparent);
+  margin-bottom: 48px;
+}
+
+.directory-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.directory-header h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 10px;
+}
+
+.directory-header h2 em {
+  color: var(--gold);
+  font-style: normal;
+}
+
+.directory-header p {
+  color: var(--muted);
+  font-size: 0.95rem;
+  max-width: 520px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.directory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.directory-card {
+  background: var(--white);
+  border: 1px solid var(--ivory-dark);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow);
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+  text-decoration: none;
+  color: inherit;
+}
+
+.directory-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(13,16,40,0.12);
+  border-color: rgba(212,160,86,0.3);
+}
+
+.card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.card-icon {
+  font-size: 1.3rem;
+  color: var(--gold);
+}
+
+.card-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.badge-free {
+  background: var(--green-light);
+  color: var(--green);
+}
+
+.badge-client {
+  background: var(--yellow-light);
+  color: var(--yellow);
+}
+
+.badge-coach {
+  background: var(--gold-dim);
+  color: var(--gold);
+  border: 1px solid rgba(212, 160, 86, 0.2);
+}
+
+.directory-card h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.15rem;
+  color: var(--navy);
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.directory-card p {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  margin-bottom: 18px;
+  flex-grow: 1;
+}
+
+.card-action-link {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.02em;
+  transition: color 0.2s;
+}
+
+.directory-card:hover .card-action-link {
+  color: var(--navy);
+}
+
+/* ── RESPONSIVE DIRECTORY ── */
+
+@media (max-width: 680px) {
+  .directory-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .directory-card {
+    padding: 22px 20px;
+  }
+
+  .directory-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .directory-header p {
+    font-size: 0.88rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .directory-card {
+    padding: 18px 16px;
+  }
+
+  .directory-header {
+    margin-bottom: 24px;
+  }
+
+  .directory-header h2 {
+    font-size: 1.35rem;
+  }
+}
