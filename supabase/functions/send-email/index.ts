@@ -1,5 +1,12 @@
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-import { corsHeaders } from "../_shared/cors.ts";
+
+export const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
 
 interface EmailRequest {
   to: string | string[];
@@ -104,7 +111,7 @@ serve(async (req: Request) => {
       const hint =
         resendResponse.status === 403 &&
         rawMsg.includes("verify a domain")
-          ? " Verify phoenixclearinsight.com at https://resend.com/domains."
+          ? " Verify assessmentphoenixclearinsight.com at https://resend.com/domains."
           : "";
       return new Response(
         JSON.stringify({
