@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { env, validateClientEnv } from '../config/env';
+import { env, validateClientEnv } from '../config/env.js';
 
 const envStatus = validateClientEnv();
 

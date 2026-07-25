@@ -1,5 +1,5 @@
-import { env } from '../config/env';
-import { getSupabaseClient } from './supabaseClient';
+import { env } from '../config/env.js';
+import { getSupabaseClient } from './supabaseClient.js';
 
 const RESEND_EMAILS_URL = 'https://api.resend.com/emails';
 
@@ -160,6 +160,10 @@ function isAbsoluteUrl(url) {
   return typeof url === 'string' && /^(https?:)?\/\//.test(url);
 }
 
+function isRelativeUrl(url) {
+  return typeof url === 'string' && url.startsWith('/');
+}
+
 export async function sendEmailViaApi({ to, subject, html, text, from, replyTo, bcc, cc, signal }) {
   if (!env.emailApiUrl) {
     return {
@@ -168,11 +172,11 @@ export async function sendEmailViaApi({ to, subject, html, text, from, replyTo, 
     };
   }
 
-  if (!import.meta.env.DEV && !isAbsoluteUrl(env.emailApiUrl)) {
+  if (!isAbsoluteUrl(env.emailApiUrl) && !isRelativeUrl(env.emailApiUrl)) {
     return {
       data: null,
       error:
-        'Relative email API URLs are only supported in development. In production, set VITE_EMAIL_API_URL to an absolute HTTPS endpoint or use the Supabase send-email function.',
+        'Email API URL must be an absolute HTTPS URL or a same-origin relative path. Set VITE_EMAIL_API_URL accordingly.',
     };
   }
 
@@ -217,7 +221,7 @@ export async function sendEmailViaApi({ to, subject, html, text, from, replyTo, 
 function shouldUseEmailApiProxy() {
   if (!env.emailApiUrl) return false;
   if (import.meta.env.DEV) return true;
-  return isAbsoluteUrl(env.emailApiUrl);
+  return isAbsoluteUrl(env.emailApiUrl) || isRelativeUrl(env.emailApiUrl);
 }
 
 /**
@@ -229,22 +233,38 @@ function shouldUseEmailApiProxy() {
  *  3. Direct Resend from browser — local dev fallback only
  */
 export async function sendEmail(payload) {
+  const errors = [];
+
   if (shouldUseEmailApiProxy()) {
-    return sendEmailViaApi(payload);
+    const apiResult = await sendEmailViaApi(payload);
+    if (!apiResult.error) {
+      return apiResult;
+    }
+    errors.push(apiResult.error);
   }
 
   const { client } = getSupabaseClient();
   if (client) {
-    return sendEmailViaSupabaseFunction(payload);
+    const supabaseResult = await sendEmailViaSupabaseFunction(payload);
+    if (!supabaseResult.error) {
+      return supabaseResult;
+    }
+    errors.push(supabaseResult.error);
   }
 
   if (import.meta.env.DEV && env.resendApiKey) {
-    return sendEmailWithResend(payload);
+    const resendResult = await sendEmailWithResend(payload);
+    if (!resendResult.error) {
+      return resendResult;
+    }
+    errors.push(resendResult.error);
   }
 
   return {
     data: null,
     error:
-      'Email is not configured. Deploy the Supabase send-email function and set RESEND_API_KEY as a secret.',
+      errors.length > 0
+        ? errors.join(' | ')
+        : 'Email is not configured. Deploy the Supabase send-email function and set RESEND_API_KEY as a secret.',
   };
 }

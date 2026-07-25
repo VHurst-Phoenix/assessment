@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
-import { getSupabaseClient } from "../lib/supabaseClient";
-import { env } from "../config/env";
+import { env } from "../config/env.js";
+import { sendEmail as sendEmailWithFallback } from "../lib/resendClient.js";
 
 interface EmailPayload {
   to: string | string[];
@@ -37,38 +37,22 @@ export const useResendEmail = (): UseResendEmailReturn => {
     setError(null);
     setSuccess(false);
 
-    const { client, error: clientError } = getSupabaseClient();
-    if (!client) {
-      const message = clientError || "Supabase is not configured.";
-      setError(message);
-      return null;
-    }
-
     try {
-      const { data, error: invokeError } = await client.functions.invoke<EmailResponse>(
-        "send-email",
-        {
-          body: {
-            ...payload,
-            from: payload.from || env.resendFromEmail || undefined,
-          },
-        }
-      );
+      const result = await sendEmailWithFallback({
+        ...payload,
+        from: payload.from || env.resendFromEmail || undefined,
+      });
 
-      if (invokeError) {
-        console.error("Supabase send-email function invocation error details:", invokeError);
-        throw new Error(invokeError.message);
-      }
-
-      if (data?.error) {
-        console.error("Supabase send-email function returned error:", data.error);
-        throw new Error(data.error);
+      if (result.error) {
+        console.error("Email delivery failed:", result.error);
+        setError(result.error);
+        return null;
       }
 
       setSuccess(true);
-      return data || null;
+      return (result.data || null) as EmailResponse | null;
     } catch (err) {
-      console.error("Supabase send-email function invocation exception:", err);
+      console.error("Email delivery exception:", err);
       const errorMessage = err instanceof Error ? err.message : "Failed to send email";
       setError(errorMessage);
       return null;

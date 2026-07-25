@@ -1,11 +1,12 @@
-const viteEnv = import.meta.env || {};
+const viteEnv = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : {};
+const isDev = typeof import.meta !== 'undefined' && import.meta.env ? Boolean(import.meta.env.DEV) : false;
 
 const requiredClientEnv = {
   supabaseUrl: viteEnv.VITE_SUPABASE_URL || '',
   supabaseAnonKey: viteEnv.VITE_SUPABASE_ANON_KEY || '',
 };
 
-const resendApiKey = import.meta.env.DEV ? viteEnv.VITE_RESEND_API_KEY || '' : '';
+const resendApiKey = isDev ? viteEnv.VITE_RESEND_API_KEY || '' : '';
 
 export const env = {
   ...requiredClientEnv,
@@ -60,7 +61,7 @@ export function validateClientEnv() {
 }
 
 // Dev-time diagnostics so we can confirm the frontend is targeting the expected Supabase tables.
-if (import.meta.env && import.meta.env.DEV) {
+if (isDev) {
   console.log('[env] Supabase tables:', {
     assessments: env.supabaseAssessmentsTable,
     testimonials: env.supabaseTestimonialsTable,
