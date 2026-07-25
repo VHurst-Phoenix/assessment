@@ -44,6 +44,18 @@ echo "RESEND_API_KEY=YOUR_RESEND_API_KEY" > supabase/.env.local
 
 Get your Resend API key from [Resend Dashboard](https://resend.com/api-keys)
 
+For the React app, also add a root `.env` file with these values:
+
+```env
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_ANON_KEY
+VITE_EMAIL_API_URL=/api/send-email
+VITE_RESEND_API_KEY=YOUR_RESEND_API_KEY
+VITE_RESEND_FROM_EMAIL="Phoenix Clear Insight <noreply@phoenixclearinsight.com>"
+```
+
+This enables local dev email sending through the Vite proxy when the Supabase function is not available.
+
 ---
 
 ## Step 4: Set the RESEND_API_KEY Secret (Production)

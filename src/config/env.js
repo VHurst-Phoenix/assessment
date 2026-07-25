@@ -5,13 +5,15 @@ const requiredClientEnv = {
   supabaseAnonKey: viteEnv.VITE_SUPABASE_ANON_KEY || '',
 };
 
+const resendApiKey = import.meta.env.DEV ? viteEnv.VITE_RESEND_API_KEY || '' : '';
+
 export const env = {
   ...requiredClientEnv,
   supabaseAssessmentsTable: viteEnv.VITE_SUPABASE_ASSESSMENTS_TABLE || 'assessments',
   supabaseTestimonialsTable: viteEnv.VITE_SUPABASE_TESTIMONIALS_TABLE || 'testimonials',
   supabaseReadinessTable: viteEnv.VITE_SUPABASE_READINESS_TABLE || 'readiness',
   supabaseExecutionFormsTable: viteEnv.VITE_SUPABASE_EXECUTION_FORMS_TABLE || 'execution_forms',
-  resendApiKey: viteEnv.VITE_RESEND_API_KEY || '',
+  resendApiKey,
   resendFromEmail: viteEnv.VITE_RESEND_FROM_EMAIL || '',
   emailApiUrl: viteEnv.VITE_EMAIL_API_URL || '',
   convertKitApiKey: viteEnv.VITE_CONVERTKIT_API_KEY || '',

@@ -8,6 +8,8 @@ interface EmailPayload {
   html: string;
   from?: string;
   replyTo?: string;
+  bcc?: string | string[];
+  cc?: string | string[];
   text?: string;
 }
 

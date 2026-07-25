@@ -39,6 +39,9 @@ export async function sendEmailWithResend({
   html,
   text,
   from = resolveFromAddress(),
+  replyTo,
+  bcc,
+  cc,
   signal,
 }) {
   if (!env.resendApiKey) {
@@ -62,6 +65,9 @@ export async function sendEmailWithResend({
         subject,
         html,
         text,
+        ...(replyTo ? { reply_to: replyTo } : {}),
+        ...(bcc ? { bcc: normalizeRecipients(bcc) } : {}),
+        ...(cc ? { cc: normalizeRecipients(cc) } : {}),
       }),
     });
 
@@ -98,6 +104,9 @@ export async function sendEmailViaSupabaseFunction({
   html,
   text,
   from = resolveFromAddress(),
+  replyTo,
+  bcc,
+  cc,
 }) {
   const { client, error: clientError } = getSupabaseClient();
   if (!client) {
@@ -115,6 +124,9 @@ export async function sendEmailViaSupabaseFunction({
         html,
         text,
         from,
+        ...(replyTo ? { replyTo } : {}),
+        ...(bcc ? { bcc: normalizeRecipients(bcc) } : {}),
+        ...(cc ? { cc: normalizeRecipients(cc) } : {}),
       },
     });
 
@@ -123,6 +135,8 @@ export async function sendEmailViaSupabaseFunction({
       const message = invokeError.message || 'Failed to invoke email function.';
       const hint = message.includes('Requested function was not found')
         ? ' Deploy the send-email Supabase function and set RESEND_API_KEY as a secret.'
+        : message.includes('JWT') || message.includes('Unauthorized') || message.includes('Forbidden')
+        ? ' Check Supabase function auth settings: the send-email function must allow unauthenticated calls or the browser must be authenticated.'
         : '';
       return { data: null, error: message + hint };
     }
@@ -142,11 +156,23 @@ export async function sendEmailViaSupabaseFunction({
   }
 }
 
-export async function sendEmailViaApi({ to, subject, html, text, signal }) {
+function isAbsoluteUrl(url) {
+  return typeof url === 'string' && /^(https?:)?\/\//.test(url);
+}
+
+export async function sendEmailViaApi({ to, subject, html, text, from, replyTo, bcc, cc, signal }) {
   if (!env.emailApiUrl) {
     return {
       data: null,
       error: 'Email API URL is missing.',
+    };
+  }
+
+  if (!import.meta.env.DEV && !isAbsoluteUrl(env.emailApiUrl)) {
+    return {
+      data: null,
+      error:
+        'Relative email API URLs are only supported in development. In production, set VITE_EMAIL_API_URL to an absolute HTTPS endpoint or use the Supabase send-email function.',
     };
   }
 
@@ -155,7 +181,16 @@ export async function sendEmailViaApi({ to, subject, html, text, signal }) {
       method: 'POST',
       signal,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to, subject, html, text }),
+      body: JSON.stringify({
+        to,
+        subject,
+        html,
+        text,
+        from,
+        replyTo,
+        bcc,
+        cc,
+      }),
     });
 
     const payload = await parseJson(response);
@@ -179,16 +214,22 @@ export async function sendEmailViaApi({ to, subject, html, text, signal }) {
   }
 }
 
+function shouldUseEmailApiProxy() {
+  if (!env.emailApiUrl) return false;
+  if (import.meta.env.DEV) return true;
+  return isAbsoluteUrl(env.emailApiUrl);
+}
+
 /**
  * Unified send function.
  *
  * Priority:
- *  1. VITE_EMAIL_API_URL — custom backend proxy (e.g. /api/send-email in dev)
+ *  1. VITE_EMAIL_API_URL — custom backend proxy (dev or absolute URL only)
  *  2. Supabase `send-email` edge function — recommended for production
  *  3. Direct Resend from browser — local dev fallback only
  */
 export async function sendEmail(payload) {
-  if (env.emailApiUrl) {
+  if (shouldUseEmailApiProxy()) {
     return sendEmailViaApi(payload);
   }
 

@@ -4,4 +4,6 @@
 project_id = "kmrambclpujmnyxbfkjh"
 
 [functions.send-email]
-verify_jwt = true
+# Allow unauthenticated browser calls from the assessment app.
+# The email function itself still validates required payload fields.
+verify_jwt = false
