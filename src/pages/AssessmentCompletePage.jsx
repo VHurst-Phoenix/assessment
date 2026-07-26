@@ -1,7 +1,6 @@
 import { useLocation, Link } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { sendAssessmentEmail, buildEmailHTML } from '../utils/emailService';
-import { subscribeToConvertKit } from '../lib/convertKitClient';
 import { dimFullNames, dimLabels, dimPhases, archetypes } from './assessmentQuestions.js';
 import './AssessmentCompletePage.css';
 
@@ -72,8 +71,6 @@ const AssessmentCompletePage = () => {
   // 3. Outbound Email sending
   const [emailStatus, setEmailStatus] = useState('sending'); // 'sending' | 'success' | 'error'
   const [emailError, setEmailError] = useState(null);
-  const [convertKitStatus, setConvertKitStatus] = useState('idle'); // 'idle' | 'sending' | 'success' | 'error'
-  const [convertKitError, setConvertKitError] = useState(null);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [resending, setResending] = useState(false);
 
@@ -85,16 +82,9 @@ const AssessmentCompletePage = () => {
 
     setEmailStatus('sending');
     setEmailError(null);
-    setConvertKitStatus('sending');
-    setConvertKitError(null);
 
-    const [emailResult, convertKitResult] = await Promise.allSettled([
+    const [emailResult] = await Promise.allSettled([
       sendAssessmentEmail(data),
-      subscribeToConvertKit({
-        email: data.email,
-        firstName: data.firstName || '',
-        archetype: data.archetype || 'awakening',
-      }),
     ]);
 
     if (emailResult.status === 'fulfilled') {
@@ -110,18 +100,6 @@ const AssessmentCompletePage = () => {
       setEmailStatus('error');
     }
 
-    if (convertKitResult.status === 'fulfilled' && !convertKitResult.value?.error) {
-      setConvertKitStatus('success');
-    } else {
-      const convertKitFailure =
-        convertKitResult.status === 'rejected'
-          ? convertKitResult.reason?.message
-          : convertKitResult.value?.error;
-
-      console.warn('[ConvertKit] subscription failed:', convertKitFailure);
-      setConvertKitError(convertKitFailure || 'Unknown error');
-      setConvertKitStatus('error');
-    }
   };
 
   // Send on first mount
@@ -132,16 +110,9 @@ const AssessmentCompletePage = () => {
     const send = async () => {
       setEmailStatus('sending');
       setEmailError(null);
-      setConvertKitStatus('sending');
-      setConvertKitError(null);
 
-      const [emailResult, convertKitResult] = await Promise.allSettled([
+      const [emailResult] = await Promise.allSettled([
         sendAssessmentEmail(data),
-        subscribeToConvertKit({
-          email: data.email,
-          firstName: data.firstName || '',
-          archetype: data.archetype || 'awakening',
-        }),
       ]);
 
       if (cancelled) {
@@ -161,18 +132,6 @@ const AssessmentCompletePage = () => {
         setEmailStatus('error');
       }
 
-      if (convertKitResult.status === 'fulfilled' && !convertKitResult.value?.error) {
-        setConvertKitStatus('success');
-      } else {
-        const convertKitFailure =
-          convertKitResult.status === 'rejected'
-            ? convertKitResult.reason?.message
-            : convertKitResult.value?.error;
-
-        console.warn('[ConvertKit] subscription failed:', convertKitFailure);
-        setConvertKitError(convertKitFailure || 'Unknown error');
-        setConvertKitStatus('error');
-      }
     };
 
     send();
@@ -273,15 +232,6 @@ const AssessmentCompletePage = () => {
             </div>
           )}
         </div>
-
-        {convertKitStatus !== 'idle' && (
-          <div className={`convertkit-status-card convertkit-${convertKitStatus}`} style={{ marginTop: 16, padding: '14px 18px', borderRadius: 12, background: convertKitStatus === 'error' ? '#FAECEE' : '#EFF6FF', color: convertKitStatus === 'error' ? '#8B2635' : '#0D1028' }}>
-            <strong>ConvertKit automation</strong>{' '}
-            {convertKitStatus === 'sending' && '— Subscribing this contact to your automation workflow...'}
-            {convertKitStatus === 'success' && '— Contact successfully added to ConvertKit automation.'}
-            {convertKitStatus === 'error' && `— Subscription failed: ${convertKitError || 'Unknown error'}`}
-          </div>
-        )}
 
         <div className="r2-section">
           <div className="r2-section-header">

@@ -1,12 +1,13 @@
+import { Link } from 'react-router-dom';
 import './Layout.css';
 
 const Layout = ({ children }) => {
   return (
     <>
       <header className="app-heading" aria-label="Phoenix Clear Insight">
-        <div className="app-heading-brand">
+        <Link to="/" className="app-heading-brand">
           <span>Phoenix</span> Clear Insight
-        </div>
+        </Link>
         <div className="app-heading-tagline">See It · Believe It · Achieve It</div>
       </header>
 
