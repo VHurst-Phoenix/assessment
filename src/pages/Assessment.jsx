@@ -94,7 +94,7 @@ export default function Assessment() {
 
   function computeScore(items) {
     const sum = items.reduce((total, value) => total + Number(value || 0), 0)
-    return Math.max(0, Math.min(100, sum - totalQuestions))
+    return Math.max(0, sum)
   }
 
   async function handleSubmit() {

@@ -28,7 +28,7 @@ const AssessmentCompletePage = () => {
   const dimScores = data?.dimScores || [0, 0, 0, 0, 0];
   const archetype = archetypes[data?.archetype] || archetypes.awakening;
   const avgScore = Math.round(dimScores.reduce((a, b) => a + b, 0) / 5);
-  const avgPct = Math.round((avgScore / 25) * 100);
+  const avgPct = Math.round((avgScore / 125) * 100);
   const maxIdx = dimScores.indexOf(Math.max(...dimScores));
   let minIdx = dimScores.indexOf(Math.min(...dimScores));
   if (maxIdx === minIdx) minIdx = (maxIdx + 1) % 5;
@@ -204,7 +204,7 @@ const AssessmentCompletePage = () => {
         <div className="hero-label">YOUR PHOENIX CLARITY RESULTS</div>
         <div className="score-hero-row">
           <div className="score-hero-big">{animatedScore}</div>
-          <div className="score-hero-denom">/ 100</div>
+          <div className="score-hero-denom">/ 125</div>
         </div>
         <div className="r2-archetype-badge pulse-gold">{archetype.name}</div>
         <p className="score-hero-intro">{archetype.intro}</p>

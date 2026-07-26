@@ -115,7 +115,7 @@ function buildEmailHTML(data) {
         <tr><td style="padding:24px;text-align:center;">
           <div style="font-size:11px;font-weight:800;color:#6B6B7B;text-transform:uppercase;margin-bottom:8px;">YOUR CLARITY SCORE</div>
           <span style="font-size:56px;font-family:Georgia,serif;color:#0D1028;font-weight:700;">${score}</span>
-          <span style="font-size:16px;color:#6B6B7B;"> / 100</span><br><br>
+          <span style="font-size:16px;color:#6B6B7B;"> / 125</span><br><br>
           <div style="display:inline-block;background:#0D1028;color:#D4A056;font-size:14px;font-weight:700;padding:8px 24px;border-radius:30px;">${archetype.name}</div>
         </td></tr>
       </table>
@@ -147,7 +147,7 @@ async function main() {
   console.log('  From    :', FROM_EMAIL || '❌ MISSING');
   console.log('  To      :', TO_EMAIL || '(dry run — pass recipient as CLI arg)');
   console.log('  Archetype:', mockData.archetype);
-  console.log('  Score   :', mockData.score, '/ 100');
+  console.log('  Score   :', mockData.score, '/ 125');
   console.log('  DimScores:', mockData.dimScores.join(', '), '(each /25)\n');
 
   if (!TO_EMAIL) {

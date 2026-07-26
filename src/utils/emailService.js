@@ -48,7 +48,7 @@ const INTERNAL_NOTIFICATION_EMAIL = 'veta.hurst@phoenixclearinsight.com';
 
 /* ── HTML email builder ── */
 function buildEmailHTML(data) {
-  const score = Math.max(0, Math.min(100, Number(data.score) || 0));
+  const score = Math.max(0, Number(data.score) || 0);
   const archetype = archetypes[data.archetype] || archetypes.awakening;
   const dimScores = Array.isArray(data.dimScores) ? data.dimScores : [0, 0, 0, 0, 0];
   const firstName = data.firstName || 'there';
@@ -110,7 +110,7 @@ function buildEmailHTML(data) {
                     <div style="font-size:11px;font-weight:800;color:#6B6B7B;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:8px;">YOUR CLARITY SCORE</div>
                     <div style="margin-bottom:12px;">
                       <span style="font-size:56px;font-family:'Playfair Display',Georgia,serif;color:#0D1028;font-weight:700;line-height:1;">${score}</span>
-                      <span style="font-size:16px;color:#6B6B7B;"> / 100</span>
+                      <span style="font-size:16px;color:#6B6B7B;"> / 125</span>
                     </div>
                     <div style="display:inline-block;background-color:#0D1028;color:#D4A056;font-size:14px;font-weight:700;padding:8px 24px;border-radius:30px;letter-spacing:0.02em;">
                       ${archetype.name}
@@ -169,14 +169,14 @@ function buildEmailHTML(data) {
 function buildEmailText(data) {
   const archetype = archetypes[data.archetype] || archetypes.awakening;
   const firstName = data.firstName || 'there';
-  const score = Math.max(0, Math.min(100, Number(data.score) || 0));
+  const score = Math.max(0, Number(data.score) || 0);
 
   return [
     `Dear ${firstName},`,
     '',
     'Thank you for completing the Phoenix Clarity Assessment.',
     '',
-    `Your clarity score: ${score}/100`,
+    `Your clarity score: ${score}/125`,
     `Your archetype: ${archetype.name}`,
     '',
     archetype.directRead,

@@ -15,9 +15,11 @@
 // and in the dashboard, so it needs your actual copy.
 
 export const getRawTotal = (answers) => {
-  if (!Array.isArray(answers)) return null;
+  if (!Array.isArray(answers)) return 0;
   return answers.reduce((sum, val) => sum + (Number(val) || 0), 0);
 };
+
+export const getClarityScore = (answers) => getRawTotal(answers);
 
 export const scoringBands = [
   {

@@ -7,7 +7,7 @@ import {
   readinessQuestions,
   executionQuestions,
 } from './assessmentQuestions';
-import { getScoringBand } from './scoringBands';
+import { getClarityScore, getScoringBand } from './scoringBands';
 import { getAssessmentPath, getAssessmentTab } from './assessmentRoutes';
 import './AssessmentPage.css';
 
@@ -214,10 +214,7 @@ const ClarityAssessment = ({ navigate }) => {
     if (formData.firstName && formData.lastName && formData.email) setStep(2);
   };
 
-  const calculateScore = () => {
-    // Raw sum of all 25 questions (each scored 1-5) — score/125, no percentage conversion.
-    return answers.reduce((acc, val) => acc + (val || 0), 0);
-  };
+  const calculateScore = () => getClarityScore(answers);
 
   const calculateDimensionScores = () => {
     const dimScores = [0, 0, 0, 0, 0];
@@ -450,10 +447,7 @@ const GenericAssessment = ({ title, type, questions }) => {
   const fieldPrefix = `${type}-client`;
   const isReadiness = type === 'readiness';
 
-  const calculateScore = () => {
-    const total = answers.reduce((acc, val) => acc + (val || 0), 0);
-    return Math.round((total / (questions.length * 5)) * 100);
-  };
+  const calculateScore = () => getClarityScore(answers);
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
