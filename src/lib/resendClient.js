@@ -1,5 +1,4 @@
 import { env } from '../config/env.js';
-import { getSupabaseClient } from './supabaseClient.js';
 
 const RESEND_EMAILS_URL = 'https://api.resend.com/emails';
 
@@ -31,6 +30,16 @@ function getErrorMessage(error, fallback) {
 
 async function parseJson(response) {
   return response.json().catch(() => null);
+}
+
+function getIsDev() {
+  return typeof import.meta !== 'undefined' && import.meta.env ? Boolean(import.meta.env.DEV) : false;
+}
+
+export function buildSupabaseEdgeFunctionUrl(supabaseUrl, functionName = 'send-email') {
+  if (!supabaseUrl) return null;
+  const normalizedBaseUrl = supabaseUrl.replace(/\/+$/, '');
+  return `${normalizedBaseUrl}/functions/v1/${functionName}`;
 }
 
 export async function sendEmailWithResend({
@@ -108,17 +117,28 @@ export async function sendEmailViaSupabaseFunction({
   bcc,
   cc,
 }) {
-  const { client, error: clientError } = getSupabaseClient();
-  if (!client) {
+  const functionUrl = buildSupabaseEdgeFunctionUrl(env.supabaseUrl, 'send-email');
+  if (!functionUrl) {
     return {
       data: null,
-      error: clientError || 'Supabase is not configured.',
+      error: 'Supabase URL is not configured.',
     };
   }
 
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  if (env.supabaseAnonKey) {
+    headers.apikey = env.supabaseAnonKey;
+    headers.Authorization = `Bearer ${env.supabaseAnonKey}`;
+  }
+
   try {
-    const { data, error: invokeError } = await client.functions.invoke('send-email', {
-      body: {
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
         to: normalizeRecipients(to),
         subject,
         html,
@@ -127,26 +147,27 @@ export async function sendEmailViaSupabaseFunction({
         ...(replyTo ? { replyTo } : {}),
         ...(bcc ? { bcc: normalizeRecipients(bcc) } : {}),
         ...(cc ? { cc: normalizeRecipients(cc) } : {}),
-      },
+      }),
     });
 
-    if (invokeError) {
-      console.error('Supabase send-email function invocation error details:', invokeError);
-      const message = invokeError.message || 'Failed to invoke email function.';
-      const hint = message.includes('Requested function was not found')
+    const payload = await parseJson(response);
+
+    if (!response.ok) {
+      const rawMsg = payload?.error || payload?.message || `Supabase function request failed with status ${response.status}.`;
+      const hint = rawMsg.includes('not found')
         ? ' Deploy the send-email Supabase function and set RESEND_API_KEY as a secret.'
-        : message.includes('JWT') || message.includes('Unauthorized') || message.includes('Forbidden')
+        : rawMsg.includes('JWT') || rawMsg.includes('Unauthorized') || rawMsg.includes('Forbidden')
         ? ' Check Supabase function auth settings: the send-email function must allow unauthenticated calls or the browser must be authenticated.'
         : '';
-      return { data: null, error: message + hint };
+      return { data: null, error: rawMsg + hint };
     }
 
-    if (data?.error) {
-      console.error('Supabase send-email function returned error:', data.error);
-      return { data: null, error: data.error };
+    if (payload?.error) {
+      console.error('Supabase send-email function returned error:', payload.error);
+      return { data: null, error: payload.error };
     }
 
-    return { data, error: null };
+    return { data: payload, error: null };
   } catch (error) {
     console.error('Supabase send-email function invocation exception:', error);
     return {
@@ -220,7 +241,7 @@ export async function sendEmailViaApi({ to, subject, html, text, from, replyTo, 
 
 function shouldUseEmailApiProxy() {
   if (!env.emailApiUrl) return false;
-  if (import.meta.env.DEV) return true;
+  if (getIsDev()) return true;
   return isAbsoluteUrl(env.emailApiUrl) || isRelativeUrl(env.emailApiUrl);
 }
 
@@ -243,16 +264,13 @@ export async function sendEmail(payload) {
     errors.push(apiResult.error);
   }
 
-  const { client } = getSupabaseClient();
-  if (client) {
-    const supabaseResult = await sendEmailViaSupabaseFunction(payload);
-    if (!supabaseResult.error) {
-      return supabaseResult;
-    }
-    errors.push(supabaseResult.error);
+  const supabaseResult = await sendEmailViaSupabaseFunction(payload);
+  if (!supabaseResult.error) {
+    return supabaseResult;
   }
+  errors.push(supabaseResult.error);
 
-  if (import.meta.env.DEV && env.resendApiKey) {
+  if (getIsDev() && env.resendApiKey) {
     const resendResult = await sendEmailWithResend(payload);
     if (!resendResult.error) {
       return resendResult;
