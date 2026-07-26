@@ -239,10 +239,10 @@ export async function sendEmailViaApi({ to, subject, html, text, from, replyTo, 
   }
 }
 
-function shouldUseEmailApiProxy() {
-  if (!env.emailApiUrl) return false;
-  if (getIsDev()) return true;
-  return isAbsoluteUrl(env.emailApiUrl) || isRelativeUrl(env.emailApiUrl);
+export function shouldUseEmailApiProxy(emailApiUrl = env.emailApiUrl, isDev = getIsDev()) {
+  if (!emailApiUrl) return false;
+  if (isDev) return true;
+  return isAbsoluteUrl(emailApiUrl);
 }
 
 /**
