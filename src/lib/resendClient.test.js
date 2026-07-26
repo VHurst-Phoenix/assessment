@@ -16,6 +16,13 @@ test('buildSupabaseEdgeFunctionUrl preserves a trailing slash on the Supabase ba
   );
 });
 
+test('buildSupabaseEdgeFunctionUrl preserves an explicit deployed function URL', () => {
+  assert.equal(
+    buildSupabaseEdgeFunctionUrl('https://abc123.supabase.co/functions/v1/send-email', 'send-email'),
+    'https://abc123.supabase.co/functions/v1/send-email'
+  );
+});
+
 test('shouldUseEmailApiProxy skips same-origin proxy routes in production', () => {
   assert.equal(shouldUseEmailApiProxy('/api/send-email', false), false);
 });

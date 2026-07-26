@@ -38,7 +38,11 @@ function getIsDev() {
 
 export function buildSupabaseEdgeFunctionUrl(supabaseUrl, functionName = 'send-email') {
   if (!supabaseUrl) return null;
-  const normalizedBaseUrl = supabaseUrl.replace(/\/+$/, '');
+  const trimmedUrl = supabaseUrl.trim();
+  if (/\/functions\/v1\/[^/]+\/?$/.test(trimmedUrl)) {
+    return trimmedUrl.replace(/\/+$/, '');
+  }
+  const normalizedBaseUrl = trimmedUrl.replace(/\/+$/, '');
   return `${normalizedBaseUrl}/functions/v1/${functionName}`;
 }
 
@@ -117,7 +121,7 @@ export async function sendEmailViaSupabaseFunction({
   bcc,
   cc,
 }) {
-  const functionUrl = buildSupabaseEdgeFunctionUrl(env.supabaseUrl, 'send-email');
+  const functionUrl = buildSupabaseEdgeFunctionUrl(env.emailFunctionUrl || env.supabaseUrl, 'send-email');
   if (!functionUrl) {
     return {
       data: null,
@@ -137,6 +141,7 @@ export async function sendEmailViaSupabaseFunction({
   try {
     const response = await fetch(functionUrl, {
       method: 'POST',
+      mode: 'cors',
       headers,
       body: JSON.stringify({
         to: normalizeRecipients(to),
@@ -153,8 +158,13 @@ export async function sendEmailViaSupabaseFunction({
     const payload = await parseJson(response);
 
     if (!response.ok) {
-      const rawMsg = payload?.error || payload?.message || `Supabase function request failed with status ${response.status}.`;
-      const hint = rawMsg.includes('not found')
+      const rawMsg =
+        payload?.error ||
+        payload?.message ||
+        (response.status === 404
+          ? 'The email function endpoint was not found. Deploy the send-email function and verify the configured URL.'
+          : `Supabase function request failed with status ${response.status}.`);
+      const hint = rawMsg.includes('not found') || response.status === 404
         ? ' Deploy the send-email Supabase function and set RESEND_API_KEY as a secret.'
         : rawMsg.includes('JWT') || rawMsg.includes('Unauthorized') || rawMsg.includes('Forbidden')
         ? ' Check Supabase function auth settings: the send-email function must allow unauthenticated calls or the browser must be authenticated.'
@@ -170,9 +180,13 @@ export async function sendEmailViaSupabaseFunction({
     return { data: payload, error: null };
   } catch (error) {
     console.error('Supabase send-email function invocation exception:', error);
+    const message = getErrorMessage(error, 'Unable to send email — network error.');
+    const hint = message === 'Failed to fetch'
+      ? ' The browser could not reach the configured edge-function URL. Verify VITE_EMAIL_FUNCTION_URL or VITE_SUPABASE_URL and ensure the function is deployed.'
+      : '';
     return {
       data: null,
-      error: getErrorMessage(error, 'Unable to send email — network error.'),
+      error: message + hint,
     };
   }
 }
