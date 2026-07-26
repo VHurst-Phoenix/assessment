@@ -6,7 +6,7 @@ const requiredClientEnv = {
   supabaseAnonKey: viteEnv.VITE_SUPABASE_ANON_KEY || '',
 };
 
-const resendApiKey = isDev ? viteEnv.VITE_RESEND_API_KEY || '' : '';
+const resendApiKey = viteEnv.VITE_RESEND_API_KEY || '';
 
 export const env = {
   ...requiredClientEnv,

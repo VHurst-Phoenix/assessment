@@ -260,6 +260,14 @@ export function shouldUseEmailApiProxy(emailApiUrl = env.emailApiUrl, isDev = ge
   return isAbsoluteUrl(emailApiUrl);
 }
 
+export function shouldAttemptDirectResendFallback(errorMessage, resendApiKey, isDev = getIsDev()) {
+  if (!resendApiKey) return false;
+  if (isDev) return true;
+  if (!errorMessage) return false;
+  const normalizedError = String(errorMessage).toLowerCase();
+  return /requested function was not found|failed to fetch|network error|status 404|status 500|status 403|not configured/.test(normalizedError);
+}
+
 /**
  * Unified send function.
  *
@@ -285,7 +293,7 @@ export async function sendEmail(payload) {
   }
   errors.push(supabaseResult.error);
 
-  if (getIsDev() && env.resendApiKey) {
+  if (shouldAttemptDirectResendFallback(supabaseResult.error, env.resendApiKey)) {
     const resendResult = await sendEmailWithResend(payload);
     if (!resendResult.error) {
       return resendResult;

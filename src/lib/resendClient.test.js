@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSupabaseEdgeFunctionUrl, shouldUseEmailApiProxy } from './resendClient.js';
+import {
+  buildSupabaseEdgeFunctionUrl,
+  shouldUseEmailApiProxy,
+  shouldAttemptDirectResendFallback,
+} from './resendClient.js';
 
 test('buildSupabaseEdgeFunctionUrl appends the edge function path to the Supabase base URL', () => {
   assert.equal(
@@ -33,4 +37,15 @@ test('shouldUseEmailApiProxy uses absolute URLs in production', () => {
 
 test('shouldUseEmailApiProxy allows the proxy in development', () => {
   assert.equal(shouldUseEmailApiProxy('/api/send-email', true), true);
+});
+
+test('shouldAttemptDirectResendFallback is disabled without a key', () => {
+  assert.equal(shouldAttemptDirectResendFallback('Requested function was not found', '', false), false);
+});
+
+test('shouldAttemptDirectResendFallback is enabled for missing edge-function deployments in production', () => {
+  assert.equal(
+    shouldAttemptDirectResendFallback('Requested function was not found', 'test-key', false),
+    true
+  );
 });
