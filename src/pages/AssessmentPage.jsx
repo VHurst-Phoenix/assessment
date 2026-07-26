@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createAssessment, createReadiness, createExecutionForm, createTestimonial } from '../api/dbClient';
 import {
   clarityDimensions,
@@ -8,20 +8,14 @@ import {
   executionQuestions,
 } from './assessmentQuestions';
 import { getScoringBand } from './scoringBands';
+import { getAssessmentPath, getAssessmentTab } from './assessmentRoutes';
 import './AssessmentPage.css';
 
 const AssessmentPage = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const mode = searchParams.get('mode');
-  const share = searchParams.get('share');
-  const assessmentType = searchParams.get('assessment') || 'readiness';
+  const location = useLocation();
 
-  const [activeTab, setActiveTab] = useState(() => {
-    if (mode === 'coach') return assessmentType === 'execution' ? 'execution' : 'readiness';
-    if (share === 'story') return 'testimonial';
-    return 'clarity';
-  });
+  const [activeTab, setActiveTab] = useState(() => getAssessmentTab(location));
   const [unlockedTypes, setUnlockedTypes] = useState({
     readiness: false,
     execution: false
@@ -29,9 +23,20 @@ const AssessmentPage = () => {
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
 
+  useEffect(() => {
+    setActiveTab(getAssessmentTab(location));
+  }, [location.pathname, location.search]);
+
   const currentAssessmentType = activeTab === 'execution' ? 'execution' : 'readiness';
-  const isCurrentTabUnlocked = unlockedTypes[currentAssessmentType];
+  const isCurrentTabUnlocked = (activeTab === 'readiness' || activeTab === 'execution')
+    ? unlockedTypes[currentAssessmentType]
+    : true;
   const isUnlocked = unlockedTypes.readiness || unlockedTypes.execution;
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    navigate(getAssessmentPath(tab), { replace: true });
+  };
 
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
@@ -143,25 +148,25 @@ const AssessmentPage = () => {
       <div className="tab-nav">
         <button 
           className={`tab-btn ${activeTab === 'clarity' ? 'active' : ''}`} 
-          onClick={() => setActiveTab('clarity')}
+          onClick={() => handleTabChange('clarity')}
         >
           Clarity assessment <span className="tab-badge">Free</span>
         </button>
         <button 
           className={`tab-btn ${activeTab === 'testimonial' ? 'active' : ''}`} 
-          onClick={() => setActiveTab('testimonial')}
+          onClick={() => handleTabChange('testimonial')}
         >
           Testimonials
         </button>
         <button 
           className={`tab-btn ${activeTab === 'readiness' ? 'active' : ''}`} 
-          onClick={() => setActiveTab('readiness')}
+          onClick={() => handleTabChange('readiness')}
         >
           Readiness assessment <span className="tab-badge">Coach</span>
         </button>
         <button 
           className={`tab-btn ${activeTab === 'execution' ? 'active' : ''}`} 
-          onClick={() => setActiveTab('execution')}
+          onClick={() => handleTabChange('execution')}
         >
           Execution assessment <span className="tab-badge">Week 3</span>
         </button>

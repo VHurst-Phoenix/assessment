@@ -15,7 +15,7 @@ const platformCards = [
     badge: 'Premium',
     phase: 'Believe It',
     body: 'An internal coach evaluation for identity confidence, emotional capacity, and commitment before deeper transformation work.',
-    to: '/assessment?mode=coach&assessment=readiness',
+    to: '/assessment/readiness',
     action: 'Begin Assessment'
   },
   {
@@ -23,7 +23,7 @@ const platformCards = [
     badge: 'Week 3',
     phase: 'Achieve It',
     body: 'A progress check for follow-through, aligned action, resilience, and the client’s ability to sustain momentum.',
-    to: '/assessment?mode=coach&assessment=execution',
+    to: '/assessment/execution',
     action: 'Begin Assessment'
   }
 ];
@@ -35,13 +35,13 @@ const LandingPage = () => {
         <Link className="tab-btn" to="/assessment">
           Clarity assessment <span className="tab-badge">Free</span>
         </Link>
-        <Link className="tab-btn" to="/assessment?mode=coach">
+        <Link className="tab-btn" to="/assessment/readiness">
           readiness assessment <span className="tab-badge">Premium</span>
         </Link>
-        <Link className="tab-btn" to="/assessment?mode=coach">
+        <Link className="tab-btn" to="/assessment/execution">
           execution assessment <span className="tab-badge">Week 3</span>
         </Link>
-        <Link className="tab-btn" to="/assessment?share=story">
+        <Link className="tab-btn" to="/assessment/testimonial">
           testimonials
         </Link>
       </nav>

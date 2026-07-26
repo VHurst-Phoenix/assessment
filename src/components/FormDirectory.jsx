@@ -24,7 +24,7 @@ const FormDirectory = () => {
       desc: "Evaluate prospective clients' emotional readiness and bandwidth for coaching.",
       badge: "Coach Only",
       badgeClass: "badge-coach",
-      link: "/assessment?mode=coach&assessment=readiness",
+      link: "/assessment/readiness",
       icon: "🔑"
     },
     {
@@ -32,7 +32,7 @@ const FormDirectory = () => {
       desc: "Assess action consistency, homework completion, and milestone progress.",
       badge: "Coach Only",
       badgeClass: "badge-coach",
-      link: "/assessment?mode=coach&assessment=execution",
+      link: "/assessment/execution",
       icon: "📈"
     }
   ];
