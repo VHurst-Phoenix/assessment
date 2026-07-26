@@ -181,8 +181,9 @@ export async function sendEmailViaSupabaseFunction({
   } catch (error) {
     console.error('Supabase send-email function invocation exception:', error);
     const message = getErrorMessage(error, 'Unable to send email — network error.');
+    const functionUrl = buildSupabaseEdgeFunctionUrl(env.emailFunctionUrl || env.supabaseUrl, 'send-email');
     const hint = message === 'Failed to fetch'
-      ? ' The browser could not reach the configured edge-function URL. Verify VITE_EMAIL_FUNCTION_URL or VITE_SUPABASE_URL and ensure the function is deployed.'
+      ? ` The browser could not reach the configured edge-function URL (${functionUrl || 'not configured'}). Verify VITE_EMAIL_FUNCTION_URL or VITE_SUPABASE_URL and ensure the function is deployed.`
       : '';
     return {
       data: null,
