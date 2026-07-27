@@ -28,12 +28,37 @@
   padding: 0; 
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   font-family: 'DM Sans', sans-serif;
   background: var(--ivory);
   color: var(--charcoal);
-  min-height: 100vh;
+  min-height: 100dvh;
   line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+main {
+  display: block;
+  width: 100%;
+}
+
+img,
+svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
 a {
@@ -55,6 +80,16 @@ a {
   margin-bottom: 24px;
   box-shadow: var(--shadow);
   border: 1px solid var(--ivory-dark);
+}
+
+@media (max-width: 560px) {
+  .container {
+    padding: 24px 16px 56px;
+  }
+
+  .card {
+    padding: 24px 18px;
+  }
 }
 
 /* ── TYPOGRAPHY ── */
@@ -229,6 +264,20 @@ h1 {
   max-width: 540px;
   margin: 0 auto 28px;
   line-height: 1.7;
+}
+
+@media (max-width: 680px) {
+  .hero {
+    padding: 44px 20px 40px;
+  }
+
+  .hero h1 {
+    font-size: clamp(1.7rem, 7vw, 2.4rem);
+  }
+
+  .hero p {
+    font-size: 0.95rem;
+  }
 }
 
 /* ── ANIMATIONS ── */
