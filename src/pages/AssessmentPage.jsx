@@ -33,6 +33,15 @@ const AssessmentPage = () => {
     : true;
   const isUnlocked = unlockedTypes.readiness || unlockedTypes.execution;
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate('/assessment');
+  };
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     navigate(getAssessmentPath(tab), { replace: true });
@@ -76,6 +85,14 @@ const AssessmentPage = () => {
     return (
       <div className="coach-lock-overlay">
         <form onSubmit={handlePasswordSubmit} className="coach-lock-card hover-glow">
+          <button
+            type="button"
+            className="coach-lock-close"
+            onClick={handleBack}
+            aria-label="Cancel and go back"
+          >
+            ×
+          </button>
           <div className="coach-lock-icon">{lock.icon}</div>
           <div className="coach-lock-subtitle">{lock.subtitle}</div>
           <h3>{lock.title}</h3>
@@ -91,7 +108,12 @@ const AssessmentPage = () => {
             />
           </div>
           {passwordError && <div className="coach-lock-error">Incorrect code. Try again.</div>}
-          <button type="submit" className="btn btn-primary scale-on-hover" style={{ width: '100%' }}>{lock.btnLabel}</button>
+          <div className="coach-lock-actions">
+            <button type="button" className="coach-lock-cancel-btn" onClick={handleBack}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary scale-on-hover" style={{ width: '100%' }}>{lock.btnLabel}</button>
+          </div>
           <div className="coach-lock-footer">
             <p>Don't have an access code?</p>
             <div className="coach-lock-footer-links">

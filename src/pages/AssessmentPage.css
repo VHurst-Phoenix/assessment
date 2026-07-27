@@ -296,6 +296,7 @@
 }
 
 .coach-lock-card {
+  position: relative;
   background: var(--white);
   border-radius: var(--radius);
   max-width: 380px;
@@ -304,6 +305,31 @@
   border: 1px solid var(--ivory-dark);
   box-shadow: var(--shadow-lg);
   text-align: center;
+}
+
+.coach-lock-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(139, 38, 53, 0.18);
+  border-radius: 999px;
+  background: var(--red-light);
+  color: var(--red);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.coach-lock-close:hover {
+  background: var(--red);
+  color: var(--white);
+  transform: scale(1.04);
 }
 
 .coach-lock-card h3 {
@@ -332,6 +358,35 @@
   border: 1px solid rgba(139, 38, 53, 0.12);
 }
 
+.coach-lock-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.coach-lock-cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: var(--red);
+  color: var(--white);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.coach-lock-cancel-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(139, 38, 53, 0.18);
+}
+
 .coach-lock-footer {
   margin-top: 18px;
   font-size: 0.94rem;
@@ -358,11 +413,12 @@
 }
 
 .coach-lock-footer a {
-  color: var(--navy);
+  color: var(--gold);
   text-decoration: none;
 }
 
 .coach-lock-footer a:hover {
+  color: var(--gold-light);
   text-decoration: underline;
 }
 
