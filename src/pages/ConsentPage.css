@@ -1,0 +1,190 @@
+/* ── Consent Page Styles ── */
+
+.consent-hero {
+  border-radius: 0;
+}
+
+.consent-card {
+  background: var(--white);
+  border-radius: var(--radius);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow);
+  padding: 40px 36px;
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+/* ── Section blocks ── */
+.consent-section {
+  position: relative;
+  padding: 28px 24px 24px;
+  background: var(--ivory);
+  border: 1px solid var(--ivory-dark);
+  border-radius: 14px;
+  margin-bottom: 20px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.consent-section:hover {
+  border-color: rgba(212, 160, 86, 0.35);
+  box-shadow: 0 4px 20px rgba(212, 160, 86, 0.08);
+}
+
+.consent-section-icon {
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+
+.consent-section h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0 0 10px;
+}
+
+.consent-section p {
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.75;
+  margin: 0 0 18px;
+}
+
+/* ── Custom checkbox ── */
+.consent-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--navy);
+  line-height: 1.5;
+  padding: 12px 14px;
+  background: var(--white);
+  border: 2px solid var(--ivory-dark);
+  border-radius: 10px;
+  transition: border-color 0.25s ease, background-color 0.25s ease;
+  user-select: none;
+}
+
+.consent-checkbox-label:hover {
+  border-color: var(--gold);
+  background: rgba(212, 160, 86, 0.06);
+}
+
+.consent-checkbox-label input[type="checkbox"] {
+  /* visually hidden but accessible */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.consent-checkmark {
+  position: relative;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--ivory-dark);
+  border-radius: 6px;
+  background: var(--ivory);
+  transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  margin-top: 1px;
+}
+
+.consent-checkbox-label input:checked + .consent-checkmark {
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
+.consent-checkbox-label input:checked + .consent-checkmark::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  width: 6px;
+  height: 11px;
+  border: solid var(--white);
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+
+.consent-checkbox-label input:checked ~ span:last-child {
+  color: var(--navy);
+}
+
+/* ── Error ── */
+.consent-error {
+  background: rgba(139, 38, 53, 0.08);
+  border: 1px solid rgba(139, 38, 53, 0.18);
+  color: var(--red);
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+
+/* ── Action buttons ── */
+.consent-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.consent-decline-btn {
+  flex: 0 1 auto;
+}
+
+.consent-accept-btn {
+  flex: 1 1 auto;
+  opacity: 0.5;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.consent-accept-btn.ready {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.consent-accept-btn.ready:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(212, 160, 86, 0.28);
+}
+
+/* ── Footer note ── */
+.consent-footer-note {
+  margin-top: 24px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.7;
+  text-align: center;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .consent-card {
+    padding: 28px 20px;
+  }
+
+  .consent-section {
+    padding: 22px 18px 20px;
+  }
+
+  .consent-actions {
+    flex-direction: column;
+  }
+
+  .consent-decline-btn,
+  .consent-accept-btn {
+    width: 100%;
+  }
+}

@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
+import ConsentPage from './pages/ConsentPage';
 import AssessmentPage from './pages/AssessmentPage';
 import AssessmentCompletePage from './pages/AssessmentCompletePage';
 import BlogPage from './pages/BlogPage';
@@ -15,6 +16,7 @@ function App() {
     <Layout>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/consent" element={<ConsentPage />} />
         <Route path="/assessment" element={<AssessmentPage />} />
         <Route path="/assessment/clarity" element={<AssessmentPage />} />
         <Route path="/assessment/readiness" element={<AssessmentPage />} />

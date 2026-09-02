@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getSupabaseClient } from '../lib/supabaseClient';
 
 const supabaseStatus = getSupabaseClient();
@@ -21,26 +21,42 @@ export function useAuth() {
       setIsLoading(true);
       setError('');
 
-      const { data, error: authError } = await client.auth.getUser();
+      try {
+        const { data, error: authError } = await client.auth.getUser();
 
-      if (!isMounted) return;
+        if (!isMounted) return;
 
-      if (authError) {
+        if (authError) {
+          setUser(null);
+          setError(authError.message || 'Unable to verify user access.');
+        } else {
+          setUser(data?.user || null);
+        }
+      } catch (err) {
+        if (!isMounted) return;
         setUser(null);
-        setError(authError.message || 'Unable to verify user access.');
-      } else {
-        setUser(data?.user || null);
+        setError(err?.message || 'Unable to connect to authentication server.');
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-
-      setIsLoading(false);
     };
 
     loadUser();
 
-    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-      setIsLoading(false);
-    });
+    let listener;
+    try {
+      const { data } = client.auth.onAuthStateChange((_event, session) => {
+        if (isMounted) {
+          setUser(session?.user || null);
+          setIsLoading(false);
+        }
+      });
+      listener = data;
+    } catch (err) {
+      console.error('Error setting up auth state listener:', err);
+    }
 
     return () => {
       isMounted = false;
@@ -57,3 +73,4 @@ export function useAuth() {
     error,
   };
 }
+

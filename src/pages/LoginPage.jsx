@@ -24,20 +24,30 @@ const LoginPage = () => {
       return;
     }
 
-    const { error: authError } = await client.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { error: authError } = await client.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (authError) {
-      setError(authError.message || 'Invalid email or password.');
+      if (authError) {
+        setError(authError.message || 'Invalid email or password.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const destination = location.state?.from?.pathname || '/dashboard';
+      navigate(destination, { replace: true });
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(
+        err?.message?.includes('Failed to fetch') || err?.message?.includes('fetch')
+          ? 'Unable to connect to Supabase auth service. Please check your VITE_SUPABASE_URL setting in .env.'
+          : err?.message || 'Login failed.'
+      );
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    const destination = location.state?.from?.pathname || '/dashboard';
-    navigate(destination, { replace: true });
-    setIsSubmitting(false);
   };
 
   return (
