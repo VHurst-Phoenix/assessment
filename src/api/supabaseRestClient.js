@@ -19,7 +19,11 @@ function assertSupabaseClient() {
 
 function handleSupabaseError(error, fallbackMessage) {
   if (!error) return;
-  throw new Error(error.message || fallbackMessage);
+  const message = typeof error === 'string' ? error : error.message || fallbackMessage;
+  if (message.includes('Failed to fetch') || message.includes('fetch') || message.includes('NetworkError')) {
+    throw new Error('Unable to connect to Supabase database. Please check your network connection or VITE_SUPABASE_URL configuration.');
+  }
+  throw new Error(message);
 }
 
 async function debugInsert({ tableName, row, error, fallbackMessage }) {
@@ -37,8 +41,7 @@ async function debugInsert({ tableName, row, error, fallbackMessage }) {
     fallbackMessage,
   });
 
-  const msg = error?.message || errorDetails?.details || fallbackMessage;
-  throw new Error(msg);
+  handleSupabaseError(error, fallbackMessage);
 }
 
 function isMissingColumnError(error, columnName) {
@@ -185,29 +188,37 @@ export async function createAssessment(payload) {
     .select('*')
     .single();
 
-  let { data, error } = await insertAssessment(assessmentRow(payload));
+  try {
+    let { data, error } = await insertAssessment(assessmentRow(payload));
 
-  if (isMissingColumnError(error, 'dim_scores')) {
-    console.warn('[supabaseRestClient] Supabase assessments table is missing dim_scores column. Retrying assessment insert without optional dimension scores.', {
-      originalError: error?.message,
-      timestamp: new Date().toISOString(),
-    });
-    ({ data, error } = await insertAssessment(assessmentRow(payload, { includeDimScores: false })));
+    if (isMissingColumnError(error, 'dim_scores')) {
+      console.warn('[supabaseRestClient] Supabase assessments table is missing dim_scores column. Retrying assessment insert without optional dimension scores.', {
+        originalError: error?.message,
+        timestamp: new Date().toISOString(),
+      });
+      ({ data, error } = await insertAssessment(assessmentRow(payload, { includeDimScores: false })));
+    }
+
+    handleSupabaseError(error, `Failed to create assessment in ${env.supabaseAssessmentsTable}.`);
+    return mapAssessment(data);
+  } catch (err) {
+    handleSupabaseError(err, `Failed to create assessment in ${env.supabaseAssessmentsTable}.`);
   }
-
-  handleSupabaseError(error, `Failed to create assessment in ${env.supabaseAssessmentsTable}.`);
-  return mapAssessment(data);
 }
 
 export async function listAssessments() {
   const supabase = assertSupabaseClient();
-  const { data, error } = await supabase
-    .from(env.supabaseAssessmentsTable)
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from(env.supabaseAssessmentsTable)
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  handleSupabaseError(error, `Failed to load assessments from ${env.supabaseAssessmentsTable}.`);
-  return (data || []).map(mapAssessment);
+    handleSupabaseError(error, `Failed to load assessments from ${env.supabaseAssessmentsTable}.`);
+    return (data || []).map(mapAssessment);
+  } catch (err) {
+    handleSupabaseError(err, `Failed to load assessments from ${env.supabaseAssessmentsTable}.`);
+  }
 }
 
 export async function fetchAllRows(tableName, { orderBy = 'created_at', ascending = false } = {}) {
@@ -220,27 +231,31 @@ export async function fetchAllRows(tableName, { orderBy = 'created_at', ascendin
   let from = 0;
   let rows = [];
 
-  while (true) {
-    let query = supabase
-      .from(tableName)
-      .select('*')
-      .range(from, from + pageSize - 1);
+  try {
+    while (true) {
+      let query = supabase
+        .from(tableName)
+        .select('*')
+        .range(from, from + pageSize - 1);
 
-    if (orderBy) {
-      query = query.order(orderBy, { ascending });
+      if (orderBy) {
+        query = query.order(orderBy, { ascending });
+      }
+
+      const { data, error } = await query;
+
+      handleSupabaseError(error, `Failed to fetch all rows from ${tableName}.`);
+
+      rows = rows.concat(data || []);
+
+      if (!data || data.length < pageSize) {
+        break;
+      }
+
+      from += pageSize;
     }
-
-    const { data, error } = await query;
-
-    handleSupabaseError(error, `Failed to fetch all rows from ${tableName}.`);
-
-    rows = rows.concat(data || []);
-
-    if (!data || data.length < pageSize) {
-      break;
-    }
-
-    from += pageSize;
+  } catch (err) {
+    handleSupabaseError(err, `Failed to fetch all rows from ${tableName}.`);
   }
 
   return rows;
@@ -251,38 +266,46 @@ export async function createTestimonial(payload) {
   const tableName = env.supabaseTestimonialsTable;
   const row = testimonialRow(payload);
 
-  const { data, error } = await supabase
-    .from(tableName)
-    .insert(row)
-    .select('*')
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from(tableName)
+      .insert(row)
+      .select('*')
+      .single();
 
-  if (error) {
-    return debugInsert({
-      tableName,
-      row,
-      error,
-      fallbackMessage: 'Failed to create testimonial.',
-    });
+    if (error) {
+      return debugInsert({
+        tableName,
+        row,
+        error,
+        fallbackMessage: 'Failed to create testimonial.',
+      });
+    }
+
+    return mapTestimonial(data);
+  } catch (err) {
+    handleSupabaseError(err, 'Failed to create testimonial.');
   }
-
-  return mapTestimonial(data);
 }
 
 export async function listTestimonials({ status } = {}) {
   const supabase = assertSupabaseClient();
-  let query = supabase
-    .from(env.supabaseTestimonialsTable)
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    let query = supabase
+      .from(env.supabaseTestimonialsTable)
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (status) {
-    query = query.eq('status', status);
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+    handleSupabaseError(error, 'Failed to load testimonials.');
+    return (data || []).map(mapTestimonial);
+  } catch (err) {
+    handleSupabaseError(err, 'Failed to load testimonials.');
   }
-
-  const { data, error } = await query;
-  handleSupabaseError(error, 'Failed to load testimonials.');
-  return (data || []).map(mapTestimonial);
 }
 
 export async function updateTestimonialStatus(id, status) {
@@ -295,15 +318,19 @@ export async function updateTestimonialStatus(id, status) {
   }
 
   const supabase = assertSupabaseClient();
-  const { data, error } = await supabase
-    .from(env.supabaseTestimonialsTable)
-    .update({ status })
-    .eq('id', id)
-    .select('*')
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from(env.supabaseTestimonialsTable)
+      .update({ status })
+      .eq('id', id)
+      .select('*')
+      .single();
 
-  handleSupabaseError(error, 'Failed to update testimonial.');
-  return mapTestimonial(data);
+    handleSupabaseError(error, 'Failed to update testimonial.');
+    return mapTestimonial(data);
+  } catch (err) {
+    handleSupabaseError(err, 'Failed to update testimonial.');
+  }
 }
 
 export async function createReadiness(payload) {
@@ -311,33 +338,41 @@ export async function createReadiness(payload) {
   const tableName = env.supabaseReadinessTable;
   const row = readinessRow(payload);
 
-  const { data, error } = await supabase
-    .from(tableName)
-    .insert(row)
-    .select('*')
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from(tableName)
+      .insert(row)
+      .select('*')
+      .single();
 
-  if (error) {
-    return debugInsert({
-      tableName,
-      row,
-      error,
-      fallbackMessage: 'Failed to create readiness assessment.',
-    });
+    if (error) {
+      return debugInsert({
+        tableName,
+        row,
+        error,
+        fallbackMessage: 'Failed to create readiness assessment.',
+      });
+    }
+
+    return mapReadiness(data);
+  } catch (err) {
+    handleSupabaseError(err, 'Failed to create readiness assessment.');
   }
-
-  return mapReadiness(data);
 }
 
 export async function listReadiness() {
   const supabase = assertSupabaseClient();
-  const { data, error } = await supabase
-    .from(env.supabaseReadinessTable)
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from(env.supabaseReadinessTable)
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  handleSupabaseError(error, 'Failed to load readiness records.');
-  return (data || []).map(mapReadiness);
+    handleSupabaseError(error, 'Failed to load readiness records.');
+    return (data || []).map(mapReadiness);
+  } catch (err) {
+    handleSupabaseError(err, 'Failed to load readiness records.');
+  }
 }
 
 export async function createExecutionForm(payload) {
@@ -345,33 +380,41 @@ export async function createExecutionForm(payload) {
   const tableName = env.supabaseExecutionFormsTable;
   const row = executionFormRow(payload);
 
-  const { data, error } = await supabase
-    .from(tableName)
-    .insert(row)
-    .select('*')
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from(tableName)
+      .insert(row)
+      .select('*')
+      .single();
 
-  if (error) {
-    return debugInsert({
-      tableName,
-      row,
-      error,
-      fallbackMessage: 'Failed to create execution form.',
-    });
+    if (error) {
+      return debugInsert({
+        tableName,
+        row,
+        error,
+        fallbackMessage: 'Failed to create execution form.',
+      });
+    }
+
+    return mapExecutionForm(data);
+  } catch (err) {
+    handleSupabaseError(err, 'Failed to create execution form.');
   }
-
-  return mapExecutionForm(data);
 }
 
 export async function listExecutionForms() {
   const supabase = assertSupabaseClient();
-  const { data, error } = await supabase
-    .from(env.supabaseExecutionFormsTable)
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from(env.supabaseExecutionFormsTable)
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  handleSupabaseError(error, 'Failed to load execution records.');
-  return (data || []).map(mapExecutionForm);
+    handleSupabaseError(error, 'Failed to load execution records.');
+    return (data || []).map(mapExecutionForm);
+  } catch (err) {
+    handleSupabaseError(err, 'Failed to load execution records.');
+  }
 }
 
 
@@ -384,13 +427,17 @@ export async function deleteRow(tableName, id) {
     throw new Error('Missing id for delete operation.');
   }
   const supabase = assertSupabaseClient();
-  const { data, error } = await supabase
-    .from(tableName)
-    .delete()
-    .eq('id', id)
-    .single();
-  handleSupabaseError(error, `Failed to delete row from ${tableName}.`);
-  return data;
+  try {
+    const { data, error } = await supabase
+      .from(tableName)
+      .delete()
+      .eq('id', id)
+      .single();
+    handleSupabaseError(error, `Failed to delete row from ${tableName}.`);
+    return data;
+  } catch (err) {
+    handleSupabaseError(err, `Failed to delete row from ${tableName}.`);
+  }
 }
 
 export async function deleteTestimonial(id) {
@@ -408,4 +455,5 @@ export async function deleteReadiness(id) {
 export async function deleteExecutionForm(id) {
   return deleteRow(env.supabaseExecutionFormsTable, id);
 }
+
 

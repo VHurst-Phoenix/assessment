@@ -78,9 +78,14 @@ const Dashboard = () => {
   }, [getData]);
 
   const handleLogout = async () => {
-    const { client } = getSupabaseClient();
-    await client?.auth.signOut();
-    navigate('/login');
+    try {
+      const { client } = getSupabaseClient();
+      await client?.auth.signOut();
+    } catch (err) {
+      console.warn('Sign out error:', err);
+    } finally {
+      navigate('/login');
+    }
   };
 
   const exportAllRowsToCsv = async () => {

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { createAssessment, createReadiness, createExecutionForm, createTestimonial } from '../api/dbClient';
 import {
   clarityDimensions,
@@ -9,13 +9,20 @@ import {
 } from './assessmentQuestions';
 import { getClarityScore, getScoringBand } from './scoringBands';
 import { getAssessmentPath, getAssessmentTab } from './assessmentRoutes';
+import { hasConsented } from './ConsentPage';
 import './AssessmentPage.css';
 
 const AssessmentPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [activeTab, setActiveTab] = useState(() => getAssessmentTab(location));
+  // Gate: redirect to consent form if the user hasn't consented yet
+  if (!hasConsented()) {
+    const next = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/consent?next=${next}`} replace />;
+  }
+
+  const activeTab = getAssessmentTab(location);
   const [unlockedTypes, setUnlockedTypes] = useState({
     readiness: false,
     execution: false
@@ -23,15 +30,10 @@ const AssessmentPage = () => {
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState(false);
 
-  useEffect(() => {
-    setActiveTab(getAssessmentTab(location));
-  }, [location.pathname, location.search]);
-
   const currentAssessmentType = activeTab === 'execution' ? 'execution' : 'readiness';
   const isCurrentTabUnlocked = (activeTab === 'readiness' || activeTab === 'execution')
     ? unlockedTypes[currentAssessmentType]
     : true;
-  const isUnlocked = unlockedTypes.readiness || unlockedTypes.execution;
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -43,9 +45,9 @@ const AssessmentPage = () => {
   };
 
   const handleTabChange = (tab) => {
-    setActiveTab(tab);
     navigate(getAssessmentPath(tab), { replace: true });
   };
+
 
   const handlePasswordSubmit = (e) => {
     e.preventDefault();
@@ -226,14 +228,15 @@ const AssessmentPage = () => {
 const ClarityAssessment = ({ navigate }) => {
   const [step, setStep] = useState(1);
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', gender: '', source: '', context: '' });
+  const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', company: '', segment: '', gender: '', source: '', context: '' });
+  const [consentAgreed, setConsentAgreed] = useState(false);
   const [answers, setAnswers] = useState(Array(clarityQuestions.length).fill(null));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
   const handleIntakeSubmit = (e) => {
     e.preventDefault();
-    if (formData.firstName && formData.lastName && formData.email) setStep(2);
+    if (formData.firstName && formData.lastName && formData.email && consentAgreed) setStep(2);
   };
 
   const calculateScore = () => getClarityScore(answers);
@@ -325,8 +328,8 @@ const ClarityAssessment = ({ navigate }) => {
 
       {step === 1 && (
         <div className="card intake-card animate-intake-card">
-          <h3>Before We Begin</h3>
-          <p>Tell us a little about yourself. This helps us personalize your results and ensures your clarity score is saved securely.</p>
+          <h3>Before we begin</h3>
+          <p>A few quick details, then a short consent notice — required before Question 1.</p>
 
           <form onSubmit={handleIntakeSubmit} className="unified-form">
             <div className="form-row">
@@ -354,7 +357,7 @@ const ClarityAssessment = ({ navigate }) => {
             </div>
 
             <div className="form-group">
-              <label>Email Address *</label>
+              <label>Email *</label>
               <input
                 required
                 type="email"
@@ -364,8 +367,31 @@ const ClarityAssessment = ({ navigate }) => {
               />
             </div>
 
+            <div className="form-row">
+              <div className="form-group">
+                <label>Company / Agency Affiliation <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
+                <input
+                  type="text"
+                  placeholder="Organization name"
+                  value={formData.company}
+                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Segment <span className="tab-badge" style={{ marginLeft: 6, fontSize: '0.65rem' }}>New</span></label>
+                <select value={formData.segment} onChange={(e) => setFormData({ ...formData, segment: e.target.value })}>
+                  <option value="">Select segment...</option>
+                  <option value="Individual">Individual</option>
+                  <option value="Corporate">Corporate</option>
+                  <option value="Federal">Federal</option>
+                </select>
+                <span style={{ fontSize: '0.72rem', color: 'var(--muted)', marginTop: '-4px' }}>Added alongside Affiliation, per the Dashboard Build Spec.</span>
+              </div>
+            </div>
+
             <div className="form-group">
-              <label>How do you identify? (optional)</label>
+              <label>How do you identify? <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
               <select value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })}>
                 <option value="">Prefer not to say</option>
                 <option>She/Her</option>
@@ -376,29 +402,57 @@ const ClarityAssessment = ({ navigate }) => {
             </div>
 
             <div className="form-group">
-              <label>How did you hear about Phoenix?</label>
-              <select value={formData.source} onChange={(e) => setFormData({ ...formData, source: e.target.value })}>
-                <option value="">Select one...</option>
-                <option>EPIC Live Stream</option>
-                <option>Referral from friend or colleague</option>
-                <option>Social media (TikTok, Instagram, LinkedIn)</option>
-                <option>Website search</option>
-                <option>Discovery call</option>
-                <option>Other</option>
-              </select>
+              <label>How did you hear about us? <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
+              <input
+                type="text"
+                placeholder="LinkedIn, referral, search..."
+                value={formData.source}
+                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+              />
             </div>
 
             <div className="form-group">
-              <label>What brings you here today? (optional)</label>
+              <label>What brings you here today? <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
               <textarea
                 rows="3"
-                placeholder="A few words about what's bringing you to this moment..."
+                placeholder="Anything you'd like to share before starting."
                 value={formData.context}
                 onChange={(e) => setFormData({ ...formData, context: e.target.value })}
               />
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: 16 }}>
+            {/* ── Participation & Data Use Notice ── */}
+            <div className="consent-notice-block">
+              <div className="consent-notice-heading">Participation &amp; Data Use Notice</div>
+              <div className="consent-notice-body">
+                <p>
+                  <strong>What we collect:</strong> your name, your email address, your organization or agency affiliation (if applicable), your Segment (Individual, Corporate, or Federal), how you identify (if you choose to share it), how you heard about Phoenix Clear Insight, your responses to the 25 assessment questions, anything you choose to share in the optional "what brings you here today" field, and any follow-up survey responses you choose to provide.
+                </p>
+                <p>
+                  <strong>How it's used:</strong> Your responses generate your Clarity Score, Band, Position, Friction Vector, and Growth Edge — sent to you by email and used, with your permission, to inform coaching conversations should you choose to work with us.
+                </p>
+                <p>
+                  <strong>Where it's stored:</strong> Stored securely, accessible only to Phoenix Clear Insight Consulting LLC.
+                </p>
+              </div>
+              <label className="consent-inline-checkbox" htmlFor="consent-intake">
+                <input
+                  id="consent-intake"
+                  type="checkbox"
+                  checked={consentAgreed}
+                  onChange={() => setConsentAgreed(!consentAgreed)}
+                />
+                <span className="consent-inline-checkmark" />
+                <span>I have read and agree to the Participation &amp; Data Use Notice above.</span>
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ width: '100%', marginTop: 16, opacity: consentAgreed ? 1 : 0.45, pointerEvents: consentAgreed ? 'auto' : 'none' }}
+              disabled={!consentAgreed}
+            >
               Begin My Clarity Assessment →
             </button>
           </form>
@@ -462,9 +516,12 @@ const GenericAssessment = ({ title, type, questions }) => {
     firstName: '',
     lastName: '',
     email: '',
+    company: '',
+    segment: '',
     sessionType: 'clarity-intensive',
     sessionDate: '',
   });
+  const [consentAgreed, setConsentAgreed] = useState(false);
   const [answers, setAnswers] = useState(Array(questions.length).fill(null));
   const fieldPrefix = `${type}-client`;
   const isReadiness = type === 'readiness';
@@ -473,6 +530,11 @@ const GenericAssessment = ({ title, type, questions }) => {
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
+
+    if (!consentAgreed) {
+      alert("Please agree to the Participation & Data Use Notice.");
+      return;
+    }
 
     if (answers.includes(null)) {
       alert("Please answer all questions before submitting.");
@@ -561,6 +623,33 @@ const GenericAssessment = ({ title, type, questions }) => {
               />
             </div>
 
+            <div className="form-row" style={{ marginTop: '12px' }}>
+              <div className="form-group" style={{ flex: 1 }}>
+                <label htmlFor={`${fieldPrefix}-company`}>Company / Agency Affiliation <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
+                <input
+                  id={`${fieldPrefix}-company`}
+                  type="text"
+                  placeholder="Organization name"
+                  value={formData.company}
+                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                />
+              </div>
+
+              <div className="form-group" style={{ flex: 1 }}>
+                <label htmlFor={`${fieldPrefix}-segment`}>Segment <span className="tab-badge" style={{ marginLeft: 6, fontSize: '0.65rem' }}>New</span></label>
+                <select 
+                  id={`${fieldPrefix}-segment`}
+                  value={formData.segment} 
+                  onChange={(e) => setFormData({ ...formData, segment: e.target.value })}
+                >
+                  <option value="">Select segment...</option>
+                  <option value="Individual">Individual</option>
+                  <option value="Corporate">Corporate</option>
+                  <option value="Federal">Federal</option>
+                </select>
+              </div>
+            </div>
+
             {isReadiness && (
               <>
                 <div className="form-group" style={{ marginTop: 12 }}>
@@ -586,6 +675,32 @@ const GenericAssessment = ({ title, type, questions }) => {
                 </div>
               </>
             )}
+
+            {/* ── Participation & Data Use Notice ── */}
+            <div className="consent-notice-block">
+              <div className="consent-notice-heading">Participation &amp; Data Use Notice</div>
+              <div className="consent-notice-body">
+                <p>
+                  <strong>What we collect:</strong> your name, your email address, your organization or agency affiliation (if applicable), your Segment (Individual, Corporate, or Federal), how you identify (if you choose to share it), how you heard about Phoenix Clear Insight, your responses to the assessment questions, anything you choose to share, and any follow-up survey responses you choose to provide.
+                </p>
+                <p>
+                  <strong>How it's used:</strong> Your responses generate your scores and profile — sent to you by email and used, with your permission, to inform coaching conversations should you choose to work with us.
+                </p>
+                <p>
+                  <strong>Where it's stored:</strong> Stored securely, accessible only to Phoenix Clear Insight Consulting LLC.
+                </p>
+              </div>
+              <label className="consent-inline-checkbox" htmlFor={`${fieldPrefix}-consent`}>
+                <input
+                  id={`${fieldPrefix}-consent`}
+                  type="checkbox"
+                  checked={consentAgreed}
+                  onChange={() => setConsentAgreed(!consentAgreed)}
+                />
+                <span className="consent-inline-checkmark" />
+                <span>I have read and agree to the Participation &amp; Data Use Notice above.</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -619,7 +734,12 @@ const GenericAssessment = ({ title, type, questions }) => {
             </div>
           ))}
 
-          <button className="btn btn-primary" style={{ width: '100%' }} type="submit">
+          <button 
+            className="btn btn-primary" 
+            style={{ width: '100%', opacity: consentAgreed ? 1 : 0.45, pointerEvents: consentAgreed ? 'auto' : 'none' }} 
+            type="submit"
+            disabled={!consentAgreed}
+          >
             Submit {title}
           </button>
         </div>

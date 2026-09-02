@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getSupabaseClient } from '../lib/supabaseClient';
-import { updateTestimonialStatus, deleteTestimonial } from '../api/dbClient';
+import { updateTestimonialStatus, deleteTestimonial, mapTestimonial } from '../api/supabaseRestClient';
+import { env } from '../config/env';
 import './StoryDetails.css';
 
 const StoryDetails = () => {
@@ -18,14 +19,15 @@ const StoryDetails = () => {
       setLoading(true);
       setError('');
       try {
-        const { client } = getSupabaseClient();
+        const { client, error: clientError } = getSupabaseClient();
+        if (clientError || !client) throw new Error(clientError || 'Supabase is not configured.');
         const { data, error } = await client
-          .from(process.env.REACT_APP_SUPABASE_TESTIMONIALS_TABLE)
+          .from(env.supabaseTestimonialsTable)
           .select('*')
           .eq('id', id)
           .single();
         if (error) throw error;
-        setStory(data);
+        setStory(mapTestimonial(data));
       } catch (err) {
         console.error(err);
         setError(err.message || 'Failed to load story.');
@@ -71,27 +73,27 @@ const StoryDetails = () => {
   return (
     <div className="story-details-card">
       <h2>Story Details</h2>
-      <div className="story-field">
-        <strong>Client:</strong> {story.firstName} {story.lastName}
-      </div>
-      <div className="story-field">
-        <strong>Stage:</strong> {story.stage}
-      </div>
-      <div className="story-field">
-        <strong>Before:</strong>
-        <p>{story.before}</p>
-      </div>
-      <div className="story-field">
-        <strong>Shift:</strong>
-        <p>{story.shift}</p>
-      </div>
-      <div className="story-field">
-        <strong>After:</strong>
-        <p>{story.after}</p>
-      </div>
-      {actionError && <div className="story-action-error">{actionError}</div>}
       {story && (
         <>
+          <div className="story-field">
+            <strong>Client:</strong> {story.firstName} {story.lastName}
+          </div>
+          <div className="story-field">
+            <strong>Stage:</strong> {story.stage}
+          </div>
+          <div className="story-field">
+            <strong>Before:</strong>
+            <p>{story.before}</p>
+          </div>
+          <div className="story-field">
+            <strong>Shift:</strong>
+            <p>{story.shift}</p>
+          </div>
+          <div className="story-field">
+            <strong>After:</strong>
+            <p>{story.after}</p>
+          </div>
+          {actionError && <div className="story-action-error">{actionError}</div>}
           <button
             className="btn btn-primary"
             disabled={isProcessing}
@@ -131,9 +133,9 @@ const StoryDetails = () => {
           </button>
         </>
       )}
-      </div>
     </div>
   );
 };
 
 export default StoryDetails;
+
