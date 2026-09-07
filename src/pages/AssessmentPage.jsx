@@ -7,33 +7,26 @@ import {
   readinessQuestions,
   executionQuestions,
 } from './assessmentQuestions';
-import { getClarityScore, getScoringBand } from './scoringBands';
+import { getCategoryScores, getClarityScore, getRawTotal, getScoringBand } from './scoringBands';
+import { getExecutionResults, getReadinessResults } from './toolScoring';
 import { getAssessmentPath, getAssessmentTab } from './assessmentRoutes';
-import { hasConsented } from './ConsentPage';
+import { hasConsented, CLARITY_CONSENT_VERSION } from '../lib/consent';
+import { useAuth } from '../hooks/useAuth';
 import './AssessmentPage.css';
 
 const AssessmentPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const activeTab = getAssessmentTab(location);
 
-  // Gate: redirect to consent form if the user hasn't consented yet
-  if (!hasConsented()) {
+  // Only the public Clarity assessment uses the digital consent screen.
+  if (activeTab === 'clarity' && !hasConsented()) {
     const next = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/consent?next=${next}`} replace />;
   }
 
-  const activeTab = getAssessmentTab(location);
-  const [unlockedTypes, setUnlockedTypes] = useState({
-    readiness: false,
-    execution: false
-  });
-  const [passwordInput, setPasswordInput] = useState('');
-  const [passwordError, setPasswordError] = useState(false);
-
   const currentAssessmentType = activeTab === 'execution' ? 'execution' : 'readiness';
-  const isCurrentTabUnlocked = (activeTab === 'readiness' || activeTab === 'execution')
-    ? unlockedTypes[currentAssessmentType]
-    : true;
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -49,18 +42,6 @@ const AssessmentPage = () => {
   };
 
 
-  const handlePasswordSubmit = (e) => {
-    e.preventDefault();
-    const expectedPassword = currentAssessmentType === 'execution' ? 'execution2027' : 'readiness2027';
-    if (passwordInput === expectedPassword) {
-      setUnlockedTypes(prev => ({ ...prev, [currentAssessmentType]: true }));
-      setPasswordError(false);
-    } else {
-      setPasswordError(true);
-      setPasswordInput('');
-    }
-  };
-
   const getLockContent = (type) => {
     if (type === 'execution') {
       return {
@@ -68,8 +49,7 @@ const AssessmentPage = () => {
         title: 'Locked Review',
         subtitle: 'Week 3+ · Coach Only',
         description: 'This form tracks client action consistency, homework completion, and milestone alignment. Reserved for active program coaches.',
-        placeholder: 'Enter execution access code',
-        btnLabel: 'Unlock Execution Review',
+        btnLabel: 'Sign in as Coach',
       };
     }
     return {
@@ -77,16 +57,32 @@ const AssessmentPage = () => {
       title: 'Locked Access',
       subtitle: 'Pre-Intake · Coach Only',
       description: 'This form evaluates a prospective client\'s emotional readiness and bandwidth before enrolling them into the program.',
-      placeholder: 'Enter readiness access code',
-      btnLabel: 'Unlock Readiness Screening',
+      btnLabel: 'Sign in as Coach',
     };
   };
 
-  if ((activeTab === 'readiness' || activeTab === 'execution') && !isCurrentTabUnlocked) {
+  if (activeTab === 'readiness' || activeTab === 'execution') {
+    if (isAuthLoading) {
+      return <div className="container"><div className="card"><p>Checking coach access…</p></div></div>;
+    }
+
+    const isCoach = isAuthenticated && user?.app_metadata?.role === 'admin';
+    if (isCoach) {
+      return (
+        <div className="animate-fade-slide">
+          <GenericAssessment
+            title={activeTab === 'readiness' ? 'Client Readiness' : 'Client Execution'}
+            type={activeTab}
+            questions={activeTab === 'readiness' ? readinessQuestions : executionQuestions}
+          />
+        </div>
+      );
+    }
+
     const lock = getLockContent(currentAssessmentType);
     return (
       <div className="coach-lock-overlay">
-        <form onSubmit={handlePasswordSubmit} className="coach-lock-card hover-glow">
+        <div className="coach-lock-card hover-glow">
           <button
             type="button"
             className="coach-lock-close"
@@ -99,32 +95,21 @@ const AssessmentPage = () => {
           <div className="coach-lock-subtitle">{lock.subtitle}</div>
           <h3>{lock.title}</h3>
           <p>{lock.description}</p>
-
-          <div className="form-group">
-            <input 
-              type="password" 
-              placeholder={lock.placeholder}
-              value={passwordInput}
-              onChange={e => setPasswordInput(e.target.value)}
-              required
-            />
-          </div>
-          {passwordError && <div className="coach-lock-error">Incorrect code. Try again.</div>}
           <div className="coach-lock-actions">
             <button type="button" className="coach-lock-cancel-btn" onClick={handleBack}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary scale-on-hover" style={{ width: '100%' }}>{lock.btnLabel}</button>
+            <button type="button" onClick={() => navigate('/login', { state: { from: location } })} className="btn btn-primary scale-on-hover" style={{ width: '100%' }}>{lock.btnLabel}</button>
           </div>
           <div className="coach-lock-footer">
-            <p>Don't have an access code?</p>
+            <p>Don't have an account?</p>
             <div className="coach-lock-footer-links">
               <Link to="/assessment">Take a free assessment</Link>
               <span>or</span>
-              <Link to="/login">GET ACCESS</Link>
+              <Link to="/login">Request Access</Link>
             </div>
           </div>
-        </form>
+        </div>
       </div>
     );
   }
@@ -230,6 +215,7 @@ const ClarityAssessment = ({ navigate }) => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', company: '', segment: '', gender: '', source: '', context: '' });
   const [consentAgreed, setConsentAgreed] = useState(false);
+  const [consentTimestamp, setConsentTimestamp] = useState(null);
   const [answers, setAnswers] = useState(Array(clarityQuestions.length).fill(null));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -241,13 +227,7 @@ const ClarityAssessment = ({ navigate }) => {
 
   const calculateScore = () => getClarityScore(answers);
 
-  const calculateDimensionScores = () => {
-    const dimScores = [0, 0, 0, 0, 0];
-    clarityQuestions.forEach((question, index) => {
-      dimScores[question.dim] += answers[index] || 0;
-    });
-    return dimScores;
-  };
+  const calculateDimensionScores = () => getCategoryScores(answers);
 
   const handleSubmit = async () => {
     if (isSubmitting) {
@@ -262,7 +242,11 @@ const ClarityAssessment = ({ navigate }) => {
     setIsSubmitting(true);
     setSubmitError('');
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     const score = calculateScore();
+    const rawScore = getRawTotal(answers);
     const dimScores = calculateDimensionScores();
     const band = getScoringBand(score);
     const assessmentData = {
@@ -270,13 +254,17 @@ const ClarityAssessment = ({ navigate }) => {
       date: new Date().toISOString(),
       answers,
       score,
+      rawScore,
       dimScores,
       archetype: band?.key || null,
       archetypeName: band?.label || null,
+      consentTimestamp,
+      consentVersion: CLARITY_CONSENT_VERSION,
     };
 
     try {
-      const savedAssessment = await createAssessment(assessmentData);
+      const savedAssessment = await createAssessment(assessmentData, { signal: controller.signal });
+      clearTimeout(timeoutId);
       navigate('/assessment-complete', {
         state: {
           ...assessmentData,
@@ -286,6 +274,7 @@ const ClarityAssessment = ({ navigate }) => {
         },
       });
     } catch (err) {
+      clearTimeout(timeoutId);
       console.error("Failed to persist clarity assessment to Supabase:", err);
       setSubmitError(err.message || 'Your assessment could not be saved to Supabase. Please try again.');
     } finally {
@@ -311,7 +300,7 @@ const ClarityAssessment = ({ navigate }) => {
 
   const activeQuestion = clarityQuestions[currentQuestion];
   const progress = Math.round(((currentQuestion + 1) / clarityQuestions.length) * 100);
-  const labels = ['', 'Rarely', 'Occasionally', 'Sometimes', 'Frequently', 'Consistently'];
+  const labels = ['', 'Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'];
 
   return (
     <>
@@ -440,7 +429,10 @@ const ClarityAssessment = ({ navigate }) => {
                   id="consent-intake"
                   type="checkbox"
                   checked={consentAgreed}
-                  onChange={() => setConsentAgreed(!consentAgreed)}
+                  onChange={(event) => {
+                    setConsentAgreed(event.target.checked);
+                    setConsentTimestamp(event.target.checked ? new Date().toISOString() : null);
+                  }}
                 />
                 <span className="consent-inline-checkmark" />
                 <span>I have read and agree to the Participation &amp; Data Use Notice above.</span>
@@ -489,10 +481,10 @@ const ClarityAssessment = ({ navigate }) => {
                 </button>
               ))}
             </div>
-            <div className="scale-ends">
-              <span>1 = Rarely</span>
-              <span>5 = Consistently</span>
-            </div>
+              <div className="scale-ends">
+                <span>1 = Strongly Disagree</span>
+                <span>5 = Strongly Agree</span>
+              </div>
           </div>
           <div className="nav-row">
             <button className="btn btn-secondary" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(currentQuestion - 1)}>← Back</button>
@@ -520,21 +512,22 @@ const GenericAssessment = ({ title, type, questions }) => {
     segment: '',
     sessionType: 'clarity-intensive',
     sessionDate: '',
+    programCheckpoint: '',
   });
   const [consentAgreed, setConsentAgreed] = useState(false);
   const [answers, setAnswers] = useState(Array(questions.length).fill(null));
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const fieldPrefix = `${type}-client`;
   const isReadiness = type === 'readiness';
+  const scaleLabels = isReadiness
+    ? ['', 'Not at all', 'Slightly', 'Moderately', 'Very', 'Extremely']
+    : ['', 'Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'];
 
-  const calculateScore = () => getClarityScore(answers);
+  const calculateResults = () => isReadiness ? getReadinessResults(answers) : getExecutionResults(answers);
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
-
-    if (!consentAgreed) {
-      alert("Please agree to the Participation & Data Use Notice.");
-      return;
-    }
 
     if (answers.includes(null)) {
       alert("Please answer all questions before submitting.");
@@ -548,40 +541,53 @@ const GenericAssessment = ({ title, type, questions }) => {
       alert("Please enter a valid client email.");
       return;
     }
+    if (!isReadiness && !formData.programCheckpoint) {
+      alert('Please select the required program checkpoint.');
+      return;
+    }
 
-    const score = calculateScore();
+    setIsSubmitting(true);
+    setSubmitError('');
+    const results = calculateResults();
     const data = {
       ...formData,
       date: new Date().toISOString(),
       answers,
-      score,
+      score: results.score,
+      categoryScores: results.categoryScores,
+      band: results.band?.label || null,
+      gap: results.gap?.archetype || null,
     };
 
-    if (type === 'readiness') {
-      try {
+    try {
+      if (type === 'readiness') {
         await createReadiness(data);
-      } catch (err) {
-        console.error("Failed to persist readiness assessment to Supabase:", err);
       }
-    }
-    if (type === 'execution') {
-      try {
+      if (type === 'execution') {
         await createExecutionForm(data);
-      } catch (err) {
-        console.error("Failed to persist execution assessment to Supabase:", err);
       }
-    }
 
-    alert('Assessment Submitted');
-    setAnswers(Array(questions.length).fill(null));
-    setFormData({
-      firstName: '',
-      lastName: '',
-      email: '',
-      sessionType: 'clarity-intensive',
-      sessionDate: '',
-    });
-  };  return (
+      alert('Assessment Submitted');
+      setAnswers(Array(questions.length).fill(null));
+      setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        company: '',
+        segment: '',
+        sessionType: 'clarity-intensive',
+        sessionDate: '',
+        programCheckpoint: '',
+      });
+    } catch (err) {
+      console.error(`Failed to persist ${type} assessment to Supabase:`, err);
+      setSubmitError(err.message || `Failed to save ${type} assessment. Your responses are still on this page.`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
     <>
       <form onSubmit={handleSubmit} noValidate>
         <div className="card intake-card">
@@ -676,6 +682,25 @@ const GenericAssessment = ({ title, type, questions }) => {
               </>
             )}
 
+            {!isReadiness && (
+              <div className="form-group" style={{ marginTop: 12 }}>
+                <label htmlFor={`${fieldPrefix}-checkpoint`}>Program Checkpoint *</label>
+                <select
+                  id={`${fieldPrefix}-checkpoint`}
+                  value={formData.programCheckpoint}
+                  onChange={(e) => setFormData({ ...formData, programCheckpoint: e.target.value })}
+                  required
+                >
+                  <option value="">Select checkpoint...</option>
+                  <option value="Week 3">Week 3</option>
+                  <option value="Week 6">Week 6</option>
+                  <option value="Week 9">Week 9</option>
+                  <option value="Week 12">Week 12</option>
+                  <option value="Program Completion">Program Completion</option>
+                </select>
+              </div>
+            )}
+
             {/* ── Participation & Data Use Notice ── */}
             <div className="consent-notice-block">
               <div className="consent-notice-heading">Participation &amp; Data Use Notice</div>
@@ -723,25 +748,27 @@ const GenericAssessment = ({ title, type, questions }) => {
                     aria-label={`Select ${num} for Question ${i + 1}`}
                   >
                     <span className="scale-num">{num}</span>
+                    <span className="scale-label">{scaleLabels[num]}</span>
                   </button>
                 ))}
               </div>
 
               <div className="scale-ends">
-                <span>1</span>
-                <span>5</span>
+                <span>1 = {scaleLabels[1]}</span>
+                <span>5 = {scaleLabels[5]}</span>
               </div>
             </div>
           ))}
 
-          <button 
-            className="btn btn-primary" 
-            style={{ width: '100%', opacity: consentAgreed ? 1 : 0.45, pointerEvents: consentAgreed ? 'auto' : 'none' }} 
+          <button
+            className="btn btn-primary"
+            style={{ width: '100%' }}
             type="submit"
-            disabled={!consentAgreed}
+            disabled={isSubmitting}
           >
-            Submit {title}
+            {isSubmitting ? 'Saving…' : `Submit ${title}`}
           </button>
+          {submitError && <div className="assessment-submit-error" role="alert">{submitError}</div>}
         </div>
       </form>
     </>
@@ -753,17 +780,26 @@ const TestimonialForm = ({ navigate }) => {
     firstName: '', lastName: '', email: '', role: '', stage: '',
     before: '', shift: '', after: '', anonymous: 'No'
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setSubmitError('');
     const testimonialData = { ...formData, status: 'Pending Review', date: new Date().toISOString() };
     try {
       await createTestimonial(testimonialData);
+      alert('Thank you for sharing your story! It is now pending review.');
+      navigate('/client-stories');
     } catch (err) {
       console.error("Failed to persist testimonial to Supabase:", err);
+      setSubmitError(err.message || 'Your story could not be saved. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
-    alert('Thank you for sharing your story! It is now pending review.');
-    navigate('/client-stories');
   };
 
   return (
@@ -788,21 +824,22 @@ const TestimonialForm = ({ navigate }) => {
             <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Role / Profession (Optional)</label>
-              <input type="text" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} />
-            </div>
-            <div className="form-group">
-              <label>Stage</label>
-              <select value={formData.stage} onChange={e => setFormData({...formData, stage: e.target.value})}>
-                <option value="">Select Stage...</option>
-                <option value="Awakening">Awakening</option>
-                <option value="Dreaming">Dreaming</option>
-                <option value="Phoenix Momentum">Phoenix Momentum</option>
-              </select>
-            </div>
-          </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Role / Profession (Optional)</label>
+                  <input type="text" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label>Clarity Band</label>
+                  <select value={formData.stage} onChange={e => setFormData({...formData, stage: e.target.value})}>
+                    <option value="">Select Band...</option>
+                    <option value="Transitioner">Transitioner</option>
+                    <option value="Strategist">Strategist</option>
+                    <option value="Executor">Executor</option>
+                    <option value="Phoenix">Phoenix</option>
+                  </select>
+                </div>
+              </div>
 
           <div className="form-group">
             <label>Before (Where were you when you started?)</label>
@@ -829,7 +866,10 @@ const TestimonialForm = ({ navigate }) => {
         </div>
 
 
-        <button type="submit" className="btn btn-gold" style={{ width: '100%', marginTop: 16 }}>Submit Story</button>
+        <button type="submit" className="btn btn-gold" style={{ width: '100%', marginTop: 16 }} disabled={isSubmitting}>
+          {isSubmitting ? 'Saving…' : 'Submit Story'}
+        </button>
+        {submitError && <div className="assessment-submit-error" role="alert">{submitError}</div>}
       </form>
 
     </div>

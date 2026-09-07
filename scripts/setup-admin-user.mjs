@@ -5,10 +5,9 @@
  * Usage:
  *   node scripts/setup-admin-user.mjs
  * 
- * This script creates an admin user in Supabase with:
- * - Email: phoenix@gmail.com
- * - Password: phoenix2026
- * - Role: admin
+ * This script creates or updates an admin user in Supabase. Supply the
+ * credentials at runtime through ADMIN_EMAIL and ADMIN_PASSWORD; never commit
+ * them to the repository.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -16,13 +15,16 @@ import 'dotenv/config';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !ADMIN_EMAIL || !ADMIN_PASSWORD) {
   console.error('❌ Missing environment variables:');
   console.error('   - VITE_SUPABASE_URL:', SUPABASE_URL ? '✓' : '✗');
   console.error('   - SUPABASE_SERVICE_ROLE_KEY:', SUPABASE_SERVICE_KEY ? '✓' : '✗');
-  console.error('\n📝 Add SUPABASE_SERVICE_ROLE_KEY to your .env file');
-  console.error('   (Get it from Supabase Dashboard → Settings → API Keys → Service Role)');
+  console.error('   - ADMIN_EMAIL:', ADMIN_EMAIL ? '✓' : '✗');
+  console.error('   - ADMIN_PASSWORD:', ADMIN_PASSWORD ? '✓' : '✗');
+  console.error('\n📝 Provide the admin credentials only through your local environment.');
   process.exit(1);
 }
 
@@ -31,8 +33,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 async function setupAdminUser() {
   console.log('🔧 Setting up admin user...\n');
 
-  const email = 'phoenix@gmail.com';
-  const password = 'phoenix2026';
+  const email = ADMIN_EMAIL;
+  const password = ADMIN_PASSWORD;
 
   try {
     // Check if user already exists
@@ -59,10 +61,7 @@ async function setupAdminUser() {
       }
 
       console.log('✓ User role updated to admin');
-      console.log(`\n✅ Admin user is ready!\n`);
-      console.log(`📧 Email: ${email}`);
-      console.log(`🔐 Password: ${password}`);
-      console.log(`🎯 Role: admin`);
+      console.log('\n✅ Admin user role is ready.');
       console.log(`\n🚀 Login at: http://localhost:5173/login`);
       return;
     }
@@ -87,10 +86,7 @@ async function setupAdminUser() {
     console.log(`✓ Email verified: true`);
     console.log(`✓ Role: admin`);
 
-    console.log(`\n✅ Admin user setup complete!\n`);
-    console.log(`📧 Email: ${email}`);
-    console.log(`🔐 Password: ${password}`);
-    console.log(`🎯 Role: admin`);
+    console.log('\n✅ Admin user setup complete.');
     console.log(`\n🚀 Login at: http://localhost:5173/login`);
   } catch (err) {
     console.error('❌ Unexpected error:', err.message);

@@ -13,33 +13,32 @@ export const clarityDimensions = [
   "Alignment & Confidence",
 ];
 
-// Short labels used in dashboards / compact UI (matches AssessmentCompletePage.jsx)
-export const dimLabels = ['Clarity', 'Confidence', 'Action', 'Alignment', 'Readiness'];
+// Display names must match the locked Clarity scoring categories.
+export const dimLabels = clarityDimensions;
 export const dimFullNames = clarityDimensions;
-export const dimPhases = ['See It', 'Believe It', 'Achieve It', 'Alignment', 'Readiness'];
 
 export const clarityQuestions = [
   { text: "I know what I am genuinely good at and can name my top strengths clearly.", dim: 0 },
   { text: "I use my strengths regularly in my work or daily life.", dim: 0 },
-  { text: "Other people often seek me out for my specific expertise or perspective.", dim: 0 },
+  { text: "I rarely find others seeking out my specific expertise or perspective.", dim: 0 },
   { text: "I feel energized, not drained, when I'm using my core skills.", dim: 0 },
   { text: "I can articulate what makes my approach or contribution unique.", dim: 0 },
   { text: "I know what matters most to me and can name my top values.", dim: 1 },
   { text: "My daily choices and actions reflect what I say I care about.", dim: 1 },
-  { text: "When something feels wrong, I can identify which value is being compromised.", dim: 1 },
+  { text: "When something feels wrong, I rarely identify which value is being compromised.", dim: 1 },
   { text: "I feel a sense of meaning and purpose in how I spend my time.", dim: 1 },
   { text: "I rarely compromise on things that are truly important to me.", dim: 1 },
   { text: "I can identify recurring patterns in my life that have helped me.", dim: 2 },
-  { text: "I can name at least one belief or habit that has been holding me back.", dim: 2 },
+  { text: "I struggle to name any belief or habit that has been holding me back.", dim: 2 },
   { text: "I understand why I tend to react or respond the way I do in stressful situations.", dim: 2 },
   { text: "I have stopped tolerating things in my life that no longer serve me.", dim: 2 },
   { text: "I can see the connection between my past experiences and my current choices.", dim: 2 },
   { text: "I have a clear sense of where I want to go in the next chapter of my life.", dim: 3 },
   { text: "I can see real opportunities available to me right now.", dim: 3 },
-  { text: "I know what my next aligned step is, even if I haven't taken it yet.", dim: 3 },
+  { text: "I rarely know what my next aligned step is, even if I haven't taken it yet.", dim: 3 },
   { text: "I feel excited—not just anxious—about what's ahead.", dim: 3 },
   { text: "I have a vision for my life that feels both meaningful and achievable.", dim: 3 },
-  { text: "I trust my own judgment when making important decisions.", dim: 4 },
+  { text: "I often doubt my own judgment when making important decisions.", dim: 4 },
   { text: "My current life situation reflects who I am becoming, not just who I've been.", dim: 4 },
   { text: "I feel confident moving forward even when I don't have all the answers.", dim: 4 },
   { text: "I believe that what I want is actually possible for me.", dim: 4 },
@@ -83,19 +82,24 @@ export const executionQuestions = [
 ];
 
 export const archetypes = {
-  phoenix_momentum: {
-    name: "Phoenix Momentum",
-    intro: `You are in the Phoenix Momentum stage.\n\nYou've figured it out and started building. The direction is clear. The work is real. What you need now isn't more clarity — it's the faith to keep pressing forward even when the tangible proof of your progress hasn't shown up yet. You're closer than you think.`,
+  phoenix: {
+    name: "Phoenix",
+    intro: `You are in the Phoenix band.\n\nYou have done the hard work of figuring it out. The direction is real. The building is happening. What your scores show is that the gap right now isn't capability or clarity — it's the faith to trust what you're building before the results are fully visible. You're closer than you think.`,
     directRead: `Your scores reveal something most people in your position never get told.\n\nYou have done the hard work of figuring it out. The direction is real. The building is happening. What your scores show is that the gap right now isn't capability or clarity — it's the faith to trust what you're building before the results are fully visible. That is one of the hardest phases of any transformation. Most people stop here because they can't see the proof yet. The Clarity Intensive is where we map exactly what the next chapter requires — and build the conviction to see it through.\n\nBook it.`
   },
-  dreaming: {
-    name: "Dreaming",
-    intro: `You are in the Dreaming stage.\n\nThe vision is there. You can see exactly what you want. The problem is that you keep waiting for the conditions to be right before you move — and the conditions are never going to be right. That is not a planning problem. That is a belief problem.`,
-    directRead: `Your scores reveal something most people in your position never get told.\n\nYou are not stuck because you lack clarity — you scored well there. You are stuck because some part of you does not yet believe you are allowed to have what you can see. That is a specific, identifiable pattern. I have seen it in dozens of high-achievers at exactly this stage, and I know what breaks it. It is not more planning. It is not more journaling. It is one direct conversation where someone who can see the pattern names it out loud.\n\nThat conversation is the Clarity Intensive. Book it.`
+  strategist: {
+    name: "Strategist",
+    intro: `You are in the Strategist band.\n\nYou can see the shift taking place — and you're beginning to live in a "new direction" way of thinking. The next obstacle isn't your ability to understand what's right; it's your willingness to bet on it even before the world confirms it.`,
+    directRead: `Your scores reveal something most people in your position never get told.\n\nYou're not stuck because you lack clarity — you scored well there. You're stuck because some part of you doesn't yet believe you're allowed to have what you can see. That belief gap shows up as hesitation, self-editing, or "waiting for certainty" that never comes.\n\nThe Clarity Intensive names the pattern and gives you a single, clear conversation that turns insight into conviction — and conviction into the kind of follow-through that changes outcomes.\n\nBook it.`
   },
-  awakening: {
-    name: "Awakening",
-    intro: `You are in the Awakening stage.\n\nYou're still figuring out the pieces and navigating your healing journey. Identity is actively shifting. You're not lost — you're discovering. The discomfort you're feeling isn't a problem to solve. It's a signal that something real is happening.`,
-    directRead: `Your scores reveal something most people in your position never get told.\n\nYou are not behind. You are not broken. You are in the middle of one of the most significant transitions a professional can go through — and you are navigating it without a map. The discomfort is not a signal that something is wrong. It is a signal that something real is happening. What you need right now is not a plan. It is a space where someone who has been exactly where you are can help you see what's actually shifting.\n\nThat space is the Clarity Intensive. Book it.`
+  transitioner: {
+    name: "Transitioner",
+    intro: `You are in the Transitioner band.\n\nYou're not starting from zero. You're in the season where the work is real, but the results are still in progress. The gap isn't typically ability — it's consistency of belief. When you don't yet feel the "proof," your mind may quietly try to protect you by downgrading the plan.`,
+    directRead: `Your scores reveal something most people in your position never get told.\n\nYou're not starting from zero. You're in the season where the work is real, but the results are still in progress. The gap isn't typically ability — it's consistency of belief. When you don't yet feel the "proof," your mind may quietly try to protect you by downgrading the plan.\n\nThe Clarity Intensive helps you turn what you already understand into a next step you can follow through on — with a belief structure strong enough to carry you until the tangible outcomes arrive.\n\nBook it.`
+  },
+  executor: {
+    name: "Executor",
+    intro: `You are in the Executor band.\n\nYou're not just understanding what to do — you're ready to move it into the world. Your clarity is deepening, your confidence is stabilizing, and your next chapter is starting to take shape through action.`,
+    directRead: `Your scores reveal something most people in your position never get told.\n\nThis is the season where belief becomes behavior. You've already done enough internal work that the remaining challenge is focus: choosing the right moves, protecting your energy, and staying consistent when things feel fast or uncertain.\n\nYour clarity isn't theoretical anymore — it's operational. You're poised to translate insight into decisions, and decisions into results.\n\nThe Clarity Intensive helps you lock in your next step so you can keep rising with less doubt and more momentum.\n\nBook it.`
   }
 };

@@ -15,6 +15,7 @@ import {
 } from '../api/dbClient';
 import { getSupabaseClient } from '../lib/supabaseClient';
 import { downloadCsv } from '../utils/csvExport';
+import { formatPercent } from './toolScoring';
 import './Dashboard.css';
 
 const tableByTab = {
@@ -181,7 +182,7 @@ const Dashboard = () => {
 
   const totalRecords = data.length;
   const scoredRecords = data.filter(item => item.score !== undefined && item.score !== null);
-  const averageScore = data.length
+  const averageScore = scoredRecords.length
     ? Math.round(scoredRecords.reduce((sum, item) => sum + (Number(item.score) || 0), 0) / scoredRecords.length)
     : 0;
   const pendingTestimonials = activeTab === 'testimonials'
@@ -225,7 +226,7 @@ const Dashboard = () => {
             {activeTab === 'testimonials'
               ? pendingTestimonials
               : activeTab === 'clarity'
-                ? `${Number.isFinite(averageScore) ? averageScore : 0} / 125`
+                ? `${Number.isFinite(averageScore) ? averageScore : 0} / 100`
                 : `${Number.isFinite(averageScore) ? averageScore : 0}%`}
           </strong>
         </div>
@@ -269,6 +270,8 @@ const Dashboard = () => {
               <th>Name</th>
               {(activeTab === 'clarity' || activeTab === 'readiness' || activeTab === 'execution') && <th>Score</th>}
               {activeTab === 'clarity' && <th>Scoring Band</th>}
+              {(activeTab === 'readiness' || activeTab === 'execution') && <th>Band</th>}
+              {(activeTab === 'readiness' || activeTab === 'execution') && <th>Gap</th>}
               {activeTab === 'testimonials' && <th>Stage</th>}
               {activeTab === 'testimonials' && <th>Status</th>}
               <th>Actions</th>
@@ -310,11 +313,17 @@ const Dashboard = () => {
                   {(activeTab === 'clarity' || activeTab === 'readiness' || activeTab === 'execution') && (
                     <td>
                       <span className="score-badge">
-                        {activeTab === 'clarity' ? `${item.score} / 125` : `${item.score}%`}
+                        {activeTab === 'clarity'
+                          ? `${item.score ?? '—'} / 100`
+                          : item.score === null || item.score === undefined
+                            ? '—'
+                            : formatPercent(item.score)}
                       </span>
                     </td>
                   )}
                   {activeTab === 'clarity' && <td>{item.archetypeName || item.archetype}</td>}
+                  {(activeTab === 'readiness' || activeTab === 'execution') && <td>{item.band || '—'}</td>}
+                  {(activeTab === 'readiness' || activeTab === 'execution') && <td>{item.gap || '—'}</td>}
                   {activeTab === 'testimonials' && <td>{item.stage}</td>}
                   {activeTab === 'testimonials' && (
                     <td>

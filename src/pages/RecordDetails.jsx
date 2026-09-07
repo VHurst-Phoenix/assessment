@@ -12,7 +12,8 @@ import {
   executionQuestions,
   dimLabels,
 } from './assessmentQuestions';
-import { getRawTotal, getScoringBand } from './scoringBands';
+import { getCategoryScores, getClarityScore, getRawTotal, getScoringBand, getPosition, getFrictionVector, getGrowthEdge } from './scoringBands';
+import { formatPercent, getExecutionResults, getReadinessResults } from './toolScoring';
 import './RecordDetails.css';
 
 // Maps the :type route param to the right fetch function and display config.
@@ -32,11 +33,11 @@ const questionSetByType = {
 };
 
 const clarityChoiceLabels = {
-  1: 'Rarely',
-  2: 'Occasionally',
-  3: 'Sometimes',
-  4: 'Frequently',
-  5: 'Consistently',
+  1: 'Strongly Disagree',
+  2: 'Disagree',
+  3: 'Neutral',
+  4: 'Agree',
+  5: 'Strongly Agree',
 };
 
 const getAnswerList = (record) => {
@@ -123,16 +124,29 @@ const RecordDetail = () => {
     );
   }
 
-  // Prefer recomputing from the saved answers array — this is robust even for
-  // older clarity records saved before the scoring system changed from a
-  // 0-100 percentage to a raw 25-125 sum. Falls back to the stored `score`
-  // field only if answers weren't saved (very old / partial records).
-  const rawTotal = config.hasDimensions
-    ? (getRawTotal(getAnswerList(record)) ?? record.score ?? null)
-    : null;
-  const band = config.hasBand ? getScoringBand(rawTotal) : null;
-  const questions = questionSetByType[type] || [];
+  // Recompute every complete Clarity record from its stored responses using
+  // the current direct-mark calculation: raw total / 125 × 100.
   const answers = getAnswerList(record);
+  const toolResults = type === 'readiness' && answers.length === readinessQuestions.length
+    ? getReadinessResults(answers)
+    : type === 'execution' && answers.length === executionQuestions.length
+      ? getExecutionResults(answers)
+      : null;
+  const hasCompleteClarityResponses = answers.length === clarityQuestions.length;
+  const clarityScore = config.hasDimensions
+    ? (hasCompleteClarityResponses ? getClarityScore(answers) : record.score ?? null)
+    : null;
+  const categoryScores = config.hasDimensions
+    ? (hasCompleteClarityResponses ? getCategoryScores(answers) : record.dimScores)
+    : null;
+  const clarityRawScore = config.hasDimensions
+    ? (hasCompleteClarityResponses ? getRawTotal(answers) : record.rawScore ?? null)
+    : null;
+  const band = config.hasBand ? getScoringBand(clarityScore) : null;
+  const position = config.hasDimensions && categoryScores ? getPosition(categoryScores) : null;
+  const frictionVector = config.hasDimensions && categoryScores && position ? getFrictionVector(categoryScores, position) : null;
+  const growthEdge = config.hasDimensions && categoryScores ? getGrowthEdge(categoryScores) : null;
+  const questions = questionSetByType[type] || [];
 
   return (
     <div className="record-detail-shell">
@@ -176,12 +190,13 @@ const RecordDetail = () => {
               {config.hasDimensions ? (
                 <div className="record-score-card">
                   <span className="record-score-label">Clarity Score</span>
-                  <strong>{rawTotal ?? '—'} / 125</strong>
+                  <strong>{clarityScore ?? '—'} / 100</strong>
+                  {clarityRawScore !== null && <small>Raw total: {clarityRawScore} / 125</small>}
                 </div>
               ) : (
                 <div className="record-score-card">
                   <span className="record-score-label">Score</span>
-                  <strong>{record.score}%</strong>
+                  <strong>{record.score === null || record.score === undefined ? '—' : formatPercent(toolResults?.score ?? record.score)}</strong>
                 </div>
               )}
               {config.hasBand && (
@@ -200,22 +215,68 @@ const RecordDetail = () => {
               </div>
             )}
 
+            {!config.hasDimensions && toolResults && (
+              <div className="record-section">
+                <h3>{type === 'readiness' ? 'Readiness' : 'Execution'} Profile</h3>
+                <div className="record-kv">
+                  <dt>Band</dt><dd>{toolResults.band?.label || '—'}</dd>
+                  <dt>Gap</dt><dd>{toolResults.gap.archetype}</dd>
+                  <dt>Lowest Category</dt><dd>{toolResults.gap.category} ({formatPercent(toolResults.gap.score)})</dd>
+                </div>
+              </div>
+            )}
+
+            {position && (
+              <div className="record-section">
+                <h3>Position</h3>
+                <div className="record-kv">
+                  <dt>Quadrant</dt><dd>{position.quadrant}</dd>
+                  <dt>Inner Axis</dt><dd>{position.innerAxis.toFixed(1)} / 50</dd>
+                  <dt>Outer Axis</dt><dd>{position.outerAxis.toFixed(1)} / 50</dd>
+                  <dt>Threshold</dt><dd>{position.threshold}</dd>
+                </div>
+              </div>
+            )}
+
+            {frictionVector && (
+              <div className="record-section">
+                <h3>Friction Vector</h3>
+                <div className="record-kv">
+                  <dt>Archetype</dt><dd>{frictionVector.archetype}</dd>
+                  <dt>Patterns & Blocks Score</dt><dd>{frictionVector.patternsBlocks} / 25</dd>
+                  <dt>Lower Axis</dt><dd>{frictionVector.lowerAxis === 'inner' ? 'Inner (Strengths & Skills + Alignment & Confidence)' : 'Outer (Values & What Matters + Direction & Opportunity)'}</dd>
+                </div>
+              </div>
+            )}
+
+            {growthEdge && (
+              <div className="record-section">
+                <h3>Growth Edge</h3>
+                <div className="record-kv">
+                  <dt>Category</dt><dd>{dimLabels[growthEdge.index]}</dd>
+                  <dt>Score</dt><dd>{growthEdge.score} / 25</dd>
+                </div>
+              </div>
+            )}
+
             {config.hasDimensions && Array.isArray(record.dimScores) && (
               <div className="record-section">
                 <h3>Five Dimensions</h3>
                 <div className="record-dims">
-                  {record.dimScores.map((score, i) => (
-                    <div className="record-dim-row" key={dimLabels[i]}>
-                      <span className="record-dim-name">{dimLabels[i]}</span>
-                      <div className="record-dim-track">
-                        <div
-                          className="record-dim-fill"
-                          style={{ width: `${Math.round((score / 25) * 100)}%` }}
-                        />
+                  {categoryScores.map((catScore, i) => {
+                    return (
+                      <div className="record-dim-row" key={dimLabels[i]}>
+                        <span className="record-dim-name">{dimLabels[i]}</span>
+                        <div className="record-dim-track">
+                          <div
+                            className="record-dim-fill"
+                            style={{ width: `${Math.round((catScore / 25) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="record-dim-num">{Number.isInteger(catScore) ? catScore : catScore.toFixed(1)} / 25</span>
                       </div>
-                      <span className="record-dim-num">{score} / 25</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

@@ -1,7 +1,8 @@
 import { useLocation, Link } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { sendAssessmentEmail, buildEmailHTML } from '../utils/emailService';
-import { dimFullNames, dimLabels, dimPhases, archetypes } from './assessmentQuestions.js';
+import { dimFullNames, dimLabels } from './assessmentQuestions.js';
+import { getPosition, getFrictionVector, getGrowthEdge, getRawTotal, getScoringBand, getScoringBandByKey } from './scoringBands.js';
 import './AssessmentCompletePage.css';
 
 const strengthInsights = [
@@ -24,12 +25,18 @@ const AssessmentCompletePage = () => {
   const location = useLocation();
   const data = location.state;
 
-  const dimScores = data?.dimScores || [0, 0, 0, 0, 0];
-  const archetype = archetypes[data?.archetype] || archetypes.awakening;
-  const avgScore = Math.round(dimScores.reduce((a, b) => a + b, 0) / 5);
-  const avgPct = Math.round((avgScore / 125) * 100);
-  const maxIdx = dimScores.indexOf(Math.max(...dimScores));
-  let minIdx = dimScores.indexOf(Math.min(...dimScores));
+  const rawDimScores = data?.dimScores || [0, 0, 0, 0, 0];
+  const categoryScores = rawDimScores;
+  const rawScore = Number(data?.rawScore ?? getRawTotal(data?.answers)) || 0;
+  const totalScore = categoryScores.reduce((a, b) => a + b, 0);
+  const band = getScoringBandByKey(data?.archetype) || getScoringBand(data?.score);
+  const position = getPosition(categoryScores);
+  const frictionVector = getFrictionVector(categoryScores, position);
+  const growthEdge = getGrowthEdge(categoryScores);
+  const avgScore = totalScore / 5;
+  const avgPct = Math.round((avgScore / 25) * 100);
+  const maxIdx = categoryScores.indexOf(Math.max(...categoryScores));
+  let minIdx = categoryScores.indexOf(Math.min(...categoryScores));
   if (maxIdx === minIdx) minIdx = (maxIdx + 1) % 5;
 
   // 1. Count Up Score Animation
@@ -83,23 +90,38 @@ const AssessmentCompletePage = () => {
     setEmailStatus('sending');
     setEmailError(null);
 
-    const [emailResult] = await Promise.allSettled([
-      sendAssessmentEmail(data),
-    ]);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    if (emailResult.status === 'fulfilled') {
-      setEmailStatus('success');
-    } else {
+    try {
+      const [emailResult] = await Promise.allSettled([
+        sendAssessmentEmail(data, controller.signal),
+      ]);
+      clearTimeout(timeoutId);
+
+      if (emailResult.status === 'fulfilled') {
+        setEmailStatus('success');
+      } else {
+        console.error('[AssessmentCompletePage] Email send failed:', {
+          error: emailResult.reason?.message,
+          email: data.email,
+          assessmentId: data.id,
+          timestamp: new Date().toISOString(),
+        });
+        setEmailError(emailResult.reason?.message || 'Unknown error');
+        setEmailStatus('error');
+      }
+    } catch (err) {
+      clearTimeout(timeoutId);
       console.error('[AssessmentCompletePage] Email send failed:', {
-        error: emailResult.reason?.message,
+        error: err.message,
         email: data.email,
         assessmentId: data.id,
         timestamp: new Date().toISOString(),
       });
-      setEmailError(emailResult.reason?.message || 'Unknown error');
+      setEmailError(err.message || 'Unknown error');
       setEmailStatus('error');
     }
-
   };
 
   // Send on first mount
@@ -111,27 +133,45 @@ const AssessmentCompletePage = () => {
       setEmailStatus('sending');
       setEmailError(null);
 
-      const [emailResult] = await Promise.allSettled([
-        sendAssessmentEmail(data),
-      ]);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      if (cancelled) {
-        return;
-      }
+      try {
+        const [emailResult] = await Promise.allSettled([
+          sendAssessmentEmail(data, controller.signal),
+        ]);
+        clearTimeout(timeoutId);
 
-      if (emailResult.status === 'fulfilled') {
-        setEmailStatus('success');
-      } else {
+        if (cancelled) {
+          return;
+        }
+
+        if (emailResult.status === 'fulfilled') {
+          setEmailStatus('success');
+        } else {
+          console.error('[AssessmentCompletePage] Initial email send failed:', {
+            error: emailResult.reason?.message,
+            email: data.email,
+            assessmentId: data.id,
+            timestamp: new Date().toISOString(),
+          });
+          setEmailError(emailResult.reason?.message || 'Unknown error');
+          setEmailStatus('error');
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (cancelled) {
+          return;
+        }
         console.error('[AssessmentCompletePage] Initial email send failed:', {
-          error: emailResult.reason?.message,
+          error: err.message,
           email: data.email,
           assessmentId: data.id,
           timestamp: new Date().toISOString(),
         });
-        setEmailError(emailResult.reason?.message || 'Unknown error');
+        setEmailError(err.message || 'Unknown error');
         setEmailStatus('error');
       }
-
     };
 
     send();
@@ -163,10 +203,11 @@ const AssessmentCompletePage = () => {
         <div className="hero-label">YOUR PHOENIX CLARITY RESULTS</div>
         <div className="score-hero-row">
           <div className="score-hero-big">{animatedScore}</div>
-          <div className="score-hero-denom">/ 125</div>
+          <div className="score-hero-denom">/ 100</div>
         </div>
-        <div className="r2-archetype-badge pulse-gold">{archetype.name}</div>
-        <p className="score-hero-intro">{archetype.intro}</p>
+        <div className="score-hero-intro">Raw total: {rawScore} / 125</div>
+        <div className="r2-archetype-badge pulse-gold">{band?.label || 'Clarity Assessment'}</div>
+        <p className="score-hero-intro">{band?.intro || 'Your results are ready for review.'}</p>
       </div>
 
       <div className="container">
@@ -236,19 +277,17 @@ const AssessmentCompletePage = () => {
         <div className="r2-section">
           <div className="r2-section-header">
             <div className="r2-section-title">YOUR FIVE DIMENSIONS</div>
-            <div className="r2-section-sub">Each dimension scored out of 20 — the gold line shows your average across all five.</div>
+            <div className="r2-section-sub">Each dimension is scored out of 25 direct marks — the gold line shows your average across all five.</div>
           </div>
         <div className="r2-dimensions">
-          {dimScores.map((rawScore, index) => {
-            const pct = Math.round((rawScore / 25) * 100);
-            const scaledOf20 = Math.round((rawScore / 25) * 20);
+          {categoryScores.map((catScore, index) => {
+            const pct = Math.round((catScore / 25) * 100);
             const statusLabel = pct >= 72 ? 'Active' : pct >= 52 ? 'Developing' : 'Emerging';
             const statusClass = pct >= 72 ? 'status-active' : pct >= 52 ? 'status-developing' : 'status-emerging';
             return (
               <div className="r2-dim-row" key={dimLabels[index]}>
                 <div className="r2-dim-label-wrap">
                   <span className="r2-dim-name">{dimLabels[index]}</span>
-                  <span className="r2-dim-phase">{dimPhases[index]}</span>
                 </div>
                 <div className="r2-dim-bar-wrap">
                   <div className="r2-dim-track">
@@ -257,7 +296,7 @@ const AssessmentCompletePage = () => {
                   </div>
                   <span className={`r2-dim-status ${statusClass}`}>{statusLabel}</span>
                 </div>
-                <div className="r2-dim-score-num">{scaledOf20}</div>
+                <div className="r2-dim-score-num">{Number.isInteger(catScore) ? catScore : catScore.toFixed(1)}</div>
               </div>
             );
           })}
@@ -280,11 +319,57 @@ const AssessmentCompletePage = () => {
         </div>
       </div>
 
+      {position && (
+        <div className="r2-section">
+          <div className="r2-section-header">
+            <div className="r2-section-title">YOUR POSITION</div>
+            <div className="r2-section-sub">Inner axis: Strengths & Skills + Alignment & Confidence · Outer axis: Values & What Matters + Direction & Opportunity</div>
+          </div>
+          <div className="r2-position-card">
+            <div className="r2-position-quadrant">{position.quadrant}</div>
+            <div className="r2-position-detail">
+              <span>Inner Axis: {position.innerAxis.toFixed(1)} / 50</span>
+              <span>Outer Axis: {position.outerAxis.toFixed(1)} / 50</span>
+              <span>Threshold: {position.threshold}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {frictionVector && (
+        <div className="r2-section">
+          <div className="r2-section-header">
+            <div className="r2-section-title">YOUR FRICTION VECTOR</div>
+            <div className="r2-section-sub">Drawn from Patterns & Blocks + your lower Position axis</div>
+          </div>
+          <div className="r2-friction-card">
+            <div className="r2-friction-archetype">{frictionVector.archetype}</div>
+            <div className="r2-friction-detail">
+              <span>Patterns & Blocks Score: {frictionVector.patternsBlocks} / 25</span>
+              <span>Lower Axis: {frictionVector.lowerAxis === 'inner' ? 'Inner (Strengths & Skills + Alignment & Confidence)' : 'Outer (Values & What Matters + Direction & Opportunity)'}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {growthEdge && (
+        <div className="r2-section">
+          <div className="r2-section-header">
+            <div className="r2-section-title">YOUR GROWTH EDGE</div>
+            <div className="r2-section-sub">Lowest-scoring category — where the next chapter begins</div>
+          </div>
+          <div className="r2-growth-edge-card">
+            <div className="r2-growth-edge-name">{dimFullNames[growthEdge.index]}</div>
+            <div className="r2-growth-edge-score">{growthEdge.score} / 25</div>
+          </div>
+        </div>
+      )}
+
       <div className="r2-direct-read">
         <div className="r2-dr-label">WHAT YOUR SCORES ARE ACTUALLY TELLING ME</div>
         <div className="r2-dr-sublabel">VETA'S DIRECT READ — BASED ON YOUR RESULTS</div>
         <div className="r2-dr-intro">Your scores reveal something most people in your position never get told.</div>
-        <div className="r2-dr-body">{archetype.directRead}</div>
+        <div className="r2-dr-body">{band?.directRead || 'Your results are ready for review with your coach.'}</div>
       </div>
 
       <div className="r2-cta-block hover-glow">

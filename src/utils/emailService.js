@@ -16,28 +16,10 @@
  */
 
 import { sendEmail } from '../lib/resendClient';
+import { clarityDimensions } from '../pages/assessmentQuestions';
+import { getRawTotal, getScoringBand, getScoringBandByKey } from '../pages/scoringBands';
 
-/* ── Archetype data (mirror of completion page) ── */
-const archetypes = {
-  phoenix_momentum: {
-    name: 'Phoenix Momentum',
-    directRead:
-      "Your scores reveal something most people in your position never get told.\n\nYou have done the hard work of figuring it out. The direction is real. The building is happening. What your scores show is that the gap right now isn't capability or clarity — it's the faith to trust what you're building before the results are fully visible. That is one of the hardest phases of any transformation. Most people stop here because they can't see the proof yet. The Clarity Intensive is where we map exactly what the next chapter requires — and build the conviction to see it through.\n\nBook it.",
-  },
-  dreaming: {
-    name: 'Dreaming',
-    directRead:
-      "Your scores reveal something most people in your position never get told.\n\nYou are not stuck because you lack clarity — you scored well there. You are stuck because some part of you does not yet believe you are allowed to have what you can see. That is a specific, identifiable pattern. I have seen it in dozens of high-achievers at exactly this stage, and I know what breaks it. It is not more planning. It is not more journaling. It is one direct conversation where someone who can see the pattern names it out loud.\n\nThat conversation is the Clarity Intensive. Book it.",
-  },
-  awakening: {
-    name: 'Awakening',
-    directRead:
-      "Your scores reveal something most people in your position never get told.\n\nYou are not behind. You are not broken. You are in the middle of one of the most significant transitions a professional can go through — and you are navigating it without a map. The discomfort is not a signal that something is wrong. It is a signal that something real is happening. What you need right now is not a plan. It is a space where someone who has been exactly where you are can help you see what's actually shifting.\n\nThat space is the Clarity Intensive. Book it.",
-  },
-};
-
-const dimLabels = ['Clarity', 'Confidence', 'Action', 'Alignment', 'Readiness'];
-const dimPhases = ['See It', 'Believe It', 'Achieve It', 'Alignment', 'Readiness'];
+const formatScore = (score) => Number.isInteger(score) ? String(score) : Number(score).toFixed(1);
 
 /**
  * Fix 1: Veta gets a BCC copy of every outbound results email so she has
@@ -49,15 +31,15 @@ const INTERNAL_NOTIFICATION_EMAIL = 'veta.hurst@phoenixclearinsight.com';
 /* ── HTML email builder ── */
 function buildEmailHTML(data) {
   const score = Math.max(0, Number(data.score) || 0);
-  const archetype = archetypes[data.archetype] || archetypes.awakening;
-  const dimScores = Array.isArray(data.dimScores) ? data.dimScores : [0, 0, 0, 0, 0];
+  const rawScore = Number(data.rawScore ?? getRawTotal(data.answers)) || 0;
+  const band = getScoringBandByKey(data.archetype) || getScoringBand(score);
+  const dimScores = Array.isArray(data.dimScores) ? data.dimScores : [];
+  const categoryScores = dimScores;
   const firstName = data.firstName || 'there';
 
-  const dimensionRows = dimScores
-    .map((rawScore, idx) => {
-      const numScore = Math.max(0, Math.min(25, Number(rawScore) || 0));
-      const pct = Math.round((numScore / 25) * 100);
-      const scaledOf20 = Math.round((numScore / 25) * 20);
+  const dimensionRows = categoryScores
+    .map((catScore, idx) => {
+      const pct = Math.round((catScore / 25) * 100);
       const statusText = pct >= 72 ? 'Active' : pct >= 52 ? 'Developing' : 'Emerging';
       const statusBg = pct >= 72 ? '#EAF4EF' : pct >= 52 ? '#FBF8E8' : '#FAECEE';
       const statusColor = pct >= 72 ? '#2D6A4F' : pct >= 52 ? '#B08A00' : '#8B2635';
@@ -65,14 +47,13 @@ function buildEmailHTML(data) {
       return `
         <tr>
           <td style="padding:12px 14px;border-bottom:1px solid #EDE8DF;">
-            <strong style="color:#0D1028;font-size:14px;display:block;">${dimLabels[idx]}</strong>
-            <span style="color:#D4A056;font-size:11px;text-transform:uppercase;font-weight:600;letter-spacing:0.04em;">${dimPhases[idx]}</span>
+            <strong style="color:#0D1028;font-size:14px;display:block;">${clarityDimensions[idx]}</strong>
           </td>
           <td style="padding:12px 14px;border-bottom:1px solid #EDE8DF;text-align:center;">
             <span style="background:${statusBg};color:${statusColor};font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.02em;">${statusText}</span>
           </td>
           <td style="padding:12px 14px;border-bottom:1px solid #EDE8DF;text-align:right;">
-            <strong style="font-family:'Playfair Display',Georgia,serif;color:#0D1028;font-size:16px;">${scaledOf20}/20</strong>
+            <strong style="font-family:'Playfair Display',Georgia,serif;color:#0D1028;font-size:16px;">${formatScore(catScore)}/25</strong>
           </td>
         </tr>`;
     })
@@ -107,13 +88,14 @@ function buildEmailHTML(data) {
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F4EF;border-radius:8px;border:1px solid #EDE8DF;margin-bottom:28px;">
                 <tr>
                   <td style="padding:24px;text-align:center;">
-                    <div style="font-size:11px;font-weight:800;color:#6B6B7B;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:8px;">YOUR CLARITY SCORE</div>
-                    <div style="margin-bottom:12px;">
-                      <span style="font-size:56px;font-family:'Playfair Display',Georgia,serif;color:#0D1028;font-weight:700;line-height:1;">${score}</span>
-                      <span style="font-size:16px;color:#6B6B7B;"> / 125</span>
-                    </div>
+                     <div style="font-size:11px;font-weight:800;color:#6B6B7B;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:8px;">YOUR CLARITY SCORE</div>
+                     <div style="margin-bottom:12px;">
+                       <span style="font-size:56px;font-family:'Playfair Display',Georgia,serif;color:#0D1028;font-weight:700;line-height:1;">${formatScore(score)}</span>
+                       <span style="font-size:16px;color:#6B6B7B;"> / 100</span>
+                     </div>
+                     <div style="font-size:12px;color:#6B6B7B;margin:-4px 0 12px;">Raw total: ${formatScore(rawScore)} / 125</div>
                     <div style="display:inline-block;background-color:#0D1028;color:#D4A056;font-size:14px;font-weight:700;padding:8px 24px;border-radius:30px;letter-spacing:0.02em;">
-                      ${archetype.name}
+                      ${band?.label || 'Clarity Assessment'}
                     </div>
                   </td>
                 </tr>
@@ -128,7 +110,7 @@ function buildEmailHTML(data) {
               <!-- Veta's Direct Read -->
               <h3 style="font-family:'Playfair Display',Georgia,serif;color:#0D1028;font-size:18px;margin:0 0 12px 0;border-bottom:1.5px solid #EDE8DF;padding-bottom:8px;font-weight:700;">My Direct Read of Your Scores</h3>
               <div style="font-size:14px;color:#1C1C1C;font-style:italic;background-color:#FDFDFD;border-left:4px solid #D4A056;padding:20px;line-height:1.75;margin:0 0 32px 0;border-radius:0 8px 8px 0;box-shadow:inset 0 1px 3px rgba(0,0,0,0.02);white-space:pre-line;">
-"${archetype.directRead}"
+"${band?.directRead || 'Your results are ready for review with your coach.'}"
               </div>
 
               <!-- CTA -->
@@ -167,26 +149,28 @@ function buildEmailHTML(data) {
 
 
 function buildEmailText(data) {
-  const archetype = archetypes[data.archetype] || archetypes.awakening;
-  const firstName = data.firstName || 'there';
   const score = Math.max(0, Number(data.score) || 0);
+  const rawScore = Number(data.rawScore ?? getRawTotal(data.answers)) || 0;
+  const band = getScoringBandByKey(data.archetype) || getScoringBand(score);
+  const firstName = data.firstName || 'there';
 
   return [
     `Dear ${firstName},`,
     '',
     'Thank you for completing the Phoenix Clarity Assessment.',
     '',
-    `Your clarity score: ${score}/125`,
-    `Your archetype: ${archetype.name}`,
+    `Your clarity score: ${formatScore(score)}/100`,
+    `Raw total: ${formatScore(rawScore)}/125`,
+    `Your Clarity Band: ${band?.label || '—'}`,
     '',
-    archetype.directRead,
+    band?.directRead || 'Your results are ready for review with your coach.',
     '',
     'Book your Clarity Session: https://www.phoenixclearinsight.com/book',
   ].join('\n');
 }
 
 /* ── Main email sender ── */
-export const sendAssessmentEmail = async (assessmentData) => {
+export const sendAssessmentEmail = async (assessmentData, signal) => {
   if (!assessmentData) {
     throw new Error('Assessment data is required.');
   }
@@ -206,6 +190,7 @@ export const sendAssessmentEmail = async (assessmentData) => {
     subject: 'Your Personal Phoenix Clarity Assessment Report',
     html: emailHTML,
     text: buildEmailText(assessmentData),
+    signal,
   });
 
   if (result.error) {
