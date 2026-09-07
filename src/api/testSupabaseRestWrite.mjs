@@ -16,7 +16,7 @@ async function main() {
     context: 'Write smoke test',
     responses: [{ q: 1, a: 5 }],
     score: 88,
-    archetype: 'phoenix_momentum',
+    archetype: 'phoenix',
     createdAt: new Date().toISOString()
   };
 
@@ -46,4 +46,3 @@ async function main() {
 }
 
 main();
-

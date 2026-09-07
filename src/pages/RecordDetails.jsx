@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   listAssessments,
@@ -12,9 +12,11 @@ import {
   executionQuestions,
   dimLabels,
 } from './assessmentQuestions';
-import { getCategoryScores, getClarityScore, getRawTotal, getScoringBand, getPosition, getFrictionVector, getGrowthEdge } from './scoringBands';
+import { MAX_CATEGORY_SCORE, getCategoryScores, getClarityScore, getRawTotal, getScoringBand, getPosition, getFrictionVector, getGrowthEdge } from './scoringBands';
 import { formatPercent, getExecutionResults, getReadinessResults } from './toolScoring';
 import './RecordDetails.css';
+
+const RecordPdfDownload = lazy(() => import('./RecordPdfDownload'));
 
 // Maps the :type route param to the right fetch function and display config.
 // Reuses the exact same list functions Dashboard.jsx already calls — no new
@@ -101,10 +103,6 @@ const RecordDetail = () => {
     return () => { isMounted = false; };
   }, [type, id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleExportPdf = () => {
-    window.print();
-  };
-
   if (isLoading) {
     return (
       <div className="record-detail-shell">
@@ -125,7 +123,7 @@ const RecordDetail = () => {
   }
 
   // Recompute every complete Clarity record from its stored responses using
-  // the current direct-mark calculation: raw total / 125 × 100.
+  // the current reverse-aware, normalized scoring model.
   const answers = getAnswerList(record);
   const toolResults = type === 'readiness' && answers.length === readinessQuestions.length
     ? getReadinessResults(answers)
@@ -152,7 +150,9 @@ const RecordDetail = () => {
     <div className="record-detail-shell">
       <div className="record-detail-toolbar no-print">
         <Link to="/dashboard" className="btn btn-secondary">← Back to Dashboard</Link>
-        <button onClick={handleExportPdf} className="btn btn-gold">📄 Export as PDF</button>
+        <Suspense fallback={<span className="btn btn-gold">Preparing export…</span>}>
+          <RecordPdfDownload config={config} record={record} type={type} summary={{ clarityScore, clarityRawScore, categoryScores, band, position, frictionVector, growthEdge, toolResults }} questions={questions} answers={answers} dimLabels={dimLabels} />
+        </Suspense>
       </div>
 
       <div className="record-detail-print-area">
@@ -171,7 +171,10 @@ const RecordDetail = () => {
             <h3>Story Submission</h3>
             <dl className="record-kv">
               <dt>Role / Profession</dt><dd>{record.role || '—'}</dd>
-              <dt>Stage</dt><dd>{record.stage || '—'}</dd>
+              <dt>Clarity Band</dt><dd>{record.band || record.stage || '—'}</dd>
+              <dt>Band Source</dt><dd>{record.bandSource || 'self-reported'}</dd>
+              <dt>Segment</dt><dd>{record.segment || '—'}</dd>
+              <dt>Band Display Consent</dt><dd>{record.showBand ? 'Show band' : 'Do not show band'}</dd>
               <dt>Status</dt><dd>{record.status || '—'}</dd>
               <dt>Anonymous</dt><dd>{record.anonymous || 'No'}</dd>
             </dl>
@@ -191,7 +194,7 @@ const RecordDetail = () => {
                 <div className="record-score-card">
                   <span className="record-score-label">Clarity Score</span>
                   <strong>{clarityScore ?? '—'} / 100</strong>
-                  {clarityRawScore !== null && <small>Raw total: {clarityRawScore} / 125</small>}
+                  {clarityRawScore !== null && <small>Adjusted response total: {clarityRawScore} / 125</small>}
                 </div>
               ) : (
                 <div className="record-score-card">
@@ -231,8 +234,8 @@ const RecordDetail = () => {
                 <h3>Position</h3>
                 <div className="record-kv">
                   <dt>Quadrant</dt><dd>{position.quadrant}</dd>
-                  <dt>Inner Axis</dt><dd>{position.innerAxis.toFixed(1)} / 50</dd>
-                  <dt>Outer Axis</dt><dd>{position.outerAxis.toFixed(1)} / 50</dd>
+                  <dt>Inner Axis</dt><dd>{position.innerAxis.toFixed(1)} / 40</dd>
+                  <dt>Outer Axis</dt><dd>{position.outerAxis.toFixed(1)} / 40</dd>
                   <dt>Threshold</dt><dd>{position.threshold}</dd>
                 </div>
               </div>
@@ -243,7 +246,7 @@ const RecordDetail = () => {
                 <h3>Friction Vector</h3>
                 <div className="record-kv">
                   <dt>Archetype</dt><dd>{frictionVector.archetype}</dd>
-                  <dt>Patterns & Blocks Score</dt><dd>{frictionVector.patternsBlocks} / 25</dd>
+                  <dt>Patterns & Blocks Score</dt><dd>{frictionVector.patternsBlocks} / 20</dd>
                   <dt>Lower Axis</dt><dd>{frictionVector.lowerAxis === 'inner' ? 'Inner (Strengths & Skills + Alignment & Confidence)' : 'Outer (Values & What Matters + Direction & Opportunity)'}</dd>
                 </div>
               </div>
@@ -254,7 +257,7 @@ const RecordDetail = () => {
                 <h3>Growth Edge</h3>
                 <div className="record-kv">
                   <dt>Category</dt><dd>{dimLabels[growthEdge.index]}</dd>
-                  <dt>Score</dt><dd>{growthEdge.score} / 25</dd>
+                  <dt>Score</dt><dd>{growthEdge.score} / 20</dd>
                 </div>
               </div>
             )}
@@ -270,10 +273,10 @@ const RecordDetail = () => {
                         <div className="record-dim-track">
                           <div
                             className="record-dim-fill"
-                            style={{ width: `${Math.round((catScore / 25) * 100)}%` }}
+                            style={{ width: `${Math.round((catScore / MAX_CATEGORY_SCORE) * 100)}%` }}
                           />
                         </div>
-                        <span className="record-dim-num">{Number.isInteger(catScore) ? catScore : catScore.toFixed(1)} / 25</span>
+                        <span className="record-dim-num">{Number.isInteger(catScore) ? catScore : catScore.toFixed(1)} / 20</span>
                       </div>
                     );
                   })}

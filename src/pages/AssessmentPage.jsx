@@ -518,6 +518,7 @@ const GenericAssessment = ({ title, type, questions }) => {
   const [answers, setAnswers] = useState(Array(questions.length).fill(null));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [submitSuccess, setSubmitSuccess] = useState('');
   const fieldPrefix = `${type}-client`;
   const isReadiness = type === 'readiness';
   const scaleLabels = isReadiness
@@ -541,6 +542,10 @@ const GenericAssessment = ({ title, type, questions }) => {
       alert("Please enter a valid client email.");
       return;
     }
+    if (!consentAgreed) {
+      alert('Please confirm the Participation & Data Use Notice.');
+      return;
+    }
     if (!isReadiness && !formData.programCheckpoint) {
       alert('Please select the required program checkpoint.');
       return;
@@ -548,6 +553,7 @@ const GenericAssessment = ({ title, type, questions }) => {
 
     setIsSubmitting(true);
     setSubmitError('');
+    setSubmitSuccess('');
     const results = calculateResults();
     const data = {
       ...formData,
@@ -567,7 +573,7 @@ const GenericAssessment = ({ title, type, questions }) => {
         await createExecutionForm(data);
       }
 
-      alert('Assessment Submitted');
+      setSubmitSuccess(`${title} was saved successfully.`);
       setAnswers(Array(questions.length).fill(null));
       setFormData({
         firstName: '',
@@ -769,6 +775,7 @@ const GenericAssessment = ({ title, type, questions }) => {
             {isSubmitting ? 'Saving…' : `Submit ${title}`}
           </button>
           {submitError && <div className="assessment-submit-error" role="alert">{submitError}</div>}
+          {submitSuccess && <div className="assessment-submit-success" role="status">{submitSuccess}</div>}
         </div>
       </form>
     </>
@@ -777,8 +784,8 @@ const GenericAssessment = ({ title, type, questions }) => {
 
 const TestimonialForm = ({ navigate }) => {
   const [formData, setFormData] = useState({
-    firstName: '', lastName: '', email: '', role: '', stage: '',
-    before: '', shift: '', after: '', anonymous: 'No'
+    firstName: '', lastName: '', email: '', role: '', segment: '', band: '',
+    before: '', shift: '', after: '', anonymous: 'No', showBand: true
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -820,8 +827,11 @@ const TestimonialForm = ({ navigate }) => {
           </div>
 
           <div className="form-group">
-            <label>Email (For follow-up, won't be displayed)</label>
+            <label>Email (For follow-up and private Clarity Band matching, never displayed)</label>
             <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+            <small style={{ color: 'var(--muted)', display: 'block', marginTop: 6 }}>
+              We use your email privately to match your prior Clarity Assessment results. It is never shown with your story.
+            </small>
           </div>
 
               <div className="form-row">
@@ -830,8 +840,8 @@ const TestimonialForm = ({ navigate }) => {
                   <input type="text" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} />
                 </div>
                 <div className="form-group">
-                  <label>Clarity Band</label>
-                  <select value={formData.stage} onChange={e => setFormData({...formData, stage: e.target.value})}>
+                  <label>Clarity Band <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(only if we cannot verify it)</span></label>
+                  <select value={formData.band} onChange={e => setFormData({...formData, band: e.target.value})}>
                     <option value="">Select Band...</option>
                     <option value="Transitioner">Transitioner</option>
                     <option value="Strategist">Strategist</option>
@@ -841,10 +851,26 @@ const TestimonialForm = ({ navigate }) => {
                 </div>
               </div>
 
+              <div className="form-group">
+                <label>Segment</label>
+                <select value={formData.segment} onChange={e => setFormData({...formData, segment: e.target.value})}>
+                  <option value="">Select segment...</option>
+                  <option value="Individual">Individual</option>
+                  <option value="Corporate">Corporate</option>
+                  <option value="Federal">Federal</option>
+                </select>
+              </div>
+
           <div className="form-group">
             <label>Before (Where were you when you started?)</label>
             <textarea required rows="3" value={formData.before} onChange={e => setFormData({...formData, before: e.target.value})}></textarea>
           </div>
+
+          <label className="consent-inline-checkbox" style={{ marginTop: 8 }}>
+            <input type="checkbox" checked={formData.showBand} onChange={e => setFormData({ ...formData, showBand: e.target.checked })} />
+            <span className="consent-inline-checkmark" />
+            <span>Show my Clarity Band with this story if it is published.</span>
+          </label>
 
           <div className="form-group">
             <label>The Shift (What changed during the work?)</label>

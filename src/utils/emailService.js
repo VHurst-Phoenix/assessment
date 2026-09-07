@@ -17,7 +17,7 @@
 
 import { sendEmail } from '../lib/resendClient';
 import { clarityDimensions } from '../pages/assessmentQuestions';
-import { getRawTotal, getScoringBand, getScoringBandByKey } from '../pages/scoringBands';
+import { MAX_CATEGORY_SCORE, getCategoryScores, getRawTotal, getScoringBand, getScoringBandByKey } from '../pages/scoringBands';
 
 const formatScore = (score) => Number.isInteger(score) ? String(score) : Number(score).toFixed(1);
 
@@ -33,13 +33,17 @@ function buildEmailHTML(data) {
   const score = Math.max(0, Number(data.score) || 0);
   const rawScore = Number(data.rawScore ?? getRawTotal(data.answers)) || 0;
   const band = getScoringBandByKey(data.archetype) || getScoringBand(score);
-  const dimScores = Array.isArray(data.dimScores) ? data.dimScores : [];
-  const categoryScores = dimScores;
+  // Prefer source responses so email reports always use the current
+  // reverse-aware scoring model. dimScores is retained as a legacy fallback
+  // for records whose response payload is unavailable.
+  const categoryScores = Array.isArray(data.answers) && data.answers.length === clarityDimensions.length * 5
+    ? getCategoryScores(data.answers)
+    : Array.isArray(data.dimScores) ? data.dimScores : [];
   const firstName = data.firstName || 'there';
 
   const dimensionRows = categoryScores
     .map((catScore, idx) => {
-      const pct = Math.round((catScore / 25) * 100);
+      const pct = Math.round((catScore / MAX_CATEGORY_SCORE) * 100);
       const statusText = pct >= 72 ? 'Active' : pct >= 52 ? 'Developing' : 'Emerging';
       const statusBg = pct >= 72 ? '#EAF4EF' : pct >= 52 ? '#FBF8E8' : '#FAECEE';
       const statusColor = pct >= 72 ? '#2D6A4F' : pct >= 52 ? '#B08A00' : '#8B2635';
@@ -53,7 +57,7 @@ function buildEmailHTML(data) {
             <span style="background:${statusBg};color:${statusColor};font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;text-transform:uppercase;letter-spacing:0.02em;">${statusText}</span>
           </td>
           <td style="padding:12px 14px;border-bottom:1px solid #EDE8DF;text-align:right;">
-            <strong style="font-family:'Playfair Display',Georgia,serif;color:#0D1028;font-size:16px;">${formatScore(catScore)}/25</strong>
+            <strong style="font-family:'Playfair Display',Georgia,serif;color:#0D1028;font-size:16px;">${formatScore(catScore)}/20</strong>
           </td>
         </tr>`;
     })
@@ -93,7 +97,7 @@ function buildEmailHTML(data) {
                        <span style="font-size:56px;font-family:'Playfair Display',Georgia,serif;color:#0D1028;font-weight:700;line-height:1;">${formatScore(score)}</span>
                        <span style="font-size:16px;color:#6B6B7B;"> / 100</span>
                      </div>
-                     <div style="font-size:12px;color:#6B6B7B;margin:-4px 0 12px;">Raw total: ${formatScore(rawScore)} / 125</div>
+                     <div style="font-size:12px;color:#6B6B7B;margin:-4px 0 12px;">Adjusted response total: ${formatScore(rawScore)} / 125</div>
                     <div style="display:inline-block;background-color:#0D1028;color:#D4A056;font-size:14px;font-weight:700;padding:8px 24px;border-radius:30px;letter-spacing:0.02em;">
                       ${band?.label || 'Clarity Assessment'}
                     </div>
@@ -160,7 +164,7 @@ function buildEmailText(data) {
     'Thank you for completing the Phoenix Clarity Assessment.',
     '',
     `Your clarity score: ${formatScore(score)}/100`,
-    `Raw total: ${formatScore(rawScore)}/125`,
+    `Adjusted response total: ${formatScore(rawScore)}/125`,
     `Your Clarity Band: ${band?.label || '—'}`,
     '',
     band?.directRead || 'Your results are ready for review with your coach.',

@@ -4,15 +4,16 @@ import { corsHeaders } from '../_shared/cors.ts';
 interface ConvertKitRequest {
   email: string;
   first_name?: string;
-  archetype?: 'phoenix_momentum' | 'dreaming' | 'awakening';
+  archetype?: 'transitioner' | 'strategist' | 'executor' | 'phoenix';
   form_id?: string;
   tag_id?: string;
 }
 
 interface ArchetypeTagMapping {
-  phoenix_momentum: string;
-  dreaming: string;
-  awakening: string;
+  transitioner: string;
+  strategist: string;
+  executor: string;
+  phoenix: string;
 }
 
 serve(async (req: Request) => {
@@ -60,9 +61,10 @@ serve(async (req: Request) => {
 
     // Get archetype-specific tag IDs from environment
     const archetypeTagMapping: ArchetypeTagMapping = {
-      phoenix_momentum: Deno.env.get('CONVERTKIT_TAG_MOMENTUM') || '',
-      dreaming: Deno.env.get('CONVERTKIT_TAG_DREAMING') || '',
-      awakening: Deno.env.get('CONVERTKIT_TAG_AWAKENING') || '',
+      transitioner: Deno.env.get('CONVERTKIT_TAG_TRANSITIONER') || '',
+      strategist: Deno.env.get('CONVERTKIT_TAG_STRATEGIST') || '',
+      executor: Deno.env.get('CONVERTKIT_TAG_EXECUTOR') || '',
+      phoenix: Deno.env.get('CONVERTKIT_TAG_PHOENIX') || '',
     };
 
     // Determine which tag to use
@@ -81,7 +83,7 @@ serve(async (req: Request) => {
     if (!selectedTagId && !formId) {
       return new Response(
         JSON.stringify({
-          error: 'ConvertKit tag or form is not configured. Set CONVERTKIT_TAG_ID, CONVERTKIT_TAG_MOMENTUM, CONVERTKIT_TAG_DREAMING, CONVERTKIT_TAG_AWAKENING, or CONVERTKIT_FORM_ID.',
+          error: 'ConvertKit tag or form is not configured. Set CONVERTKIT_TAG_ID, a CONVERTKIT_TAG_<BAND> value, or CONVERTKIT_FORM_ID.',
         }),
         {
           status: 500,

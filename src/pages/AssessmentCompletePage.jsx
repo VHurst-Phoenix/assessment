@@ -2,7 +2,7 @@ import { useLocation, Link } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import { sendAssessmentEmail, buildEmailHTML } from '../utils/emailService';
 import { dimFullNames, dimLabels } from './assessmentQuestions.js';
-import { getPosition, getFrictionVector, getGrowthEdge, getRawTotal, getScoringBand, getScoringBandByKey } from './scoringBands.js';
+import { MAX_CATEGORY_SCORE, getPosition, getFrictionVector, getGrowthEdge, getRawTotal, getScoringBand, getScoringBandByKey } from './scoringBands.js';
 import './AssessmentCompletePage.css';
 
 const strengthInsights = [
@@ -34,10 +34,9 @@ const AssessmentCompletePage = () => {
   const frictionVector = getFrictionVector(categoryScores, position);
   const growthEdge = getGrowthEdge(categoryScores);
   const avgScore = totalScore / 5;
-  const avgPct = Math.round((avgScore / 25) * 100);
+  const avgPct = Math.round((avgScore / MAX_CATEGORY_SCORE) * 100);
   const maxIdx = categoryScores.indexOf(Math.max(...categoryScores));
-  let minIdx = categoryScores.indexOf(Math.min(...categoryScores));
-  if (maxIdx === minIdx) minIdx = (maxIdx + 1) % 5;
+  const growthEdgeIndex = growthEdge?.index ?? 0;
 
   // 1. Count Up Score Animation
   const [animatedScore, setAnimatedScore] = useState(0);
@@ -205,7 +204,7 @@ const AssessmentCompletePage = () => {
           <div className="score-hero-big">{animatedScore}</div>
           <div className="score-hero-denom">/ 100</div>
         </div>
-        <div className="score-hero-intro">Raw total: {rawScore} / 125</div>
+        <div className="score-hero-intro">Adjusted response total: {rawScore} / 125</div>
         <div className="r2-archetype-badge pulse-gold">{band?.label || 'Clarity Assessment'}</div>
         <p className="score-hero-intro">{band?.intro || 'Your results are ready for review.'}</p>
       </div>
@@ -277,11 +276,11 @@ const AssessmentCompletePage = () => {
         <div className="r2-section">
           <div className="r2-section-header">
             <div className="r2-section-title">YOUR FIVE DIMENSIONS</div>
-            <div className="r2-section-sub">Each dimension is scored out of 25 direct marks — the gold line shows your average across all five.</div>
+            <div className="r2-section-sub">Each dimension is normalized to 20 points — the gold line shows your average across all five.</div>
           </div>
         <div className="r2-dimensions">
           {categoryScores.map((catScore, index) => {
-            const pct = Math.round((catScore / 25) * 100);
+            const pct = Math.round((catScore / MAX_CATEGORY_SCORE) * 100);
             const statusLabel = pct >= 72 ? 'Active' : pct >= 52 ? 'Developing' : 'Emerging';
             const statusClass = pct >= 72 ? 'status-active' : pct >= 52 ? 'status-developing' : 'status-emerging';
             return (
@@ -313,8 +312,8 @@ const AssessmentCompletePage = () => {
           </div>
           <div className="r2-split-card r2-growth-card hover-lift">
             <div className="r2-split-card-label">YOUR PRIMARY GROWTH EDGE</div>
-            <div className="r2-split-card-name">{dimFullNames[minIdx]}</div>
-            <div className="r2-split-card-body">{growthInsights[minIdx]}</div>
+            <div className="r2-split-card-name">{dimFullNames[growthEdgeIndex]}</div>
+            <div className="r2-split-card-body">{growthInsights[growthEdgeIndex]}</div>
           </div>
         </div>
       </div>
@@ -328,8 +327,8 @@ const AssessmentCompletePage = () => {
           <div className="r2-position-card">
             <div className="r2-position-quadrant">{position.quadrant}</div>
             <div className="r2-position-detail">
-              <span>Inner Axis: {position.innerAxis.toFixed(1)} / 50</span>
-              <span>Outer Axis: {position.outerAxis.toFixed(1)} / 50</span>
+              <span>Inner Axis: {position.innerAxis.toFixed(1)} / 40</span>
+              <span>Outer Axis: {position.outerAxis.toFixed(1)} / 40</span>
               <span>Threshold: {position.threshold}</span>
             </div>
           </div>
@@ -345,7 +344,7 @@ const AssessmentCompletePage = () => {
           <div className="r2-friction-card">
             <div className="r2-friction-archetype">{frictionVector.archetype}</div>
             <div className="r2-friction-detail">
-              <span>Patterns & Blocks Score: {frictionVector.patternsBlocks} / 25</span>
+              <span>Patterns & Blocks Score: {frictionVector.patternsBlocks} / 20</span>
               <span>Lower Axis: {frictionVector.lowerAxis === 'inner' ? 'Inner (Strengths & Skills + Alignment & Confidence)' : 'Outer (Values & What Matters + Direction & Opportunity)'}</span>
             </div>
           </div>
@@ -360,7 +359,7 @@ const AssessmentCompletePage = () => {
           </div>
           <div className="r2-growth-edge-card">
             <div className="r2-growth-edge-name">{dimFullNames[growthEdge.index]}</div>
-            <div className="r2-growth-edge-score">{growthEdge.score} / 25</div>
+            <div className="r2-growth-edge-score">{growthEdge.score} / 20</div>
           </div>
         </div>
       )}

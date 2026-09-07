@@ -102,7 +102,15 @@ export function mapTestimonial(row) {
     email: row.email,
     anonymous: row.anonymous,
     role: row.role,
-    stage: row.stage,
+    segment: row.segment,
+    // `stage` remains a backwards-compatible read of old testimonials.
+    stage: row.band || row.stage,
+    band: row.band || row.stage,
+    bandSource: row.band_source || 'self-reported',
+    showBand: row.show_band !== false,
+    matchedAssessmentId: row.matched_assessment_id,
+    beforeBand: row.before_band,
+    afterBand: row.after_band,
     before: row.before,
     shift: row.shift,
     after: row.after,
@@ -181,22 +189,6 @@ function assessmentRow(payload, { includeDimScores = true } = {}) {
   }
 
   return row;
-}
-
-function testimonialRow(payload) {
-  return {
-    first_name: payload.firstName ?? null,
-    last_name: payload.lastName ?? null,
-    anonymous: payload.anonymous ? String(payload.anonymous) : 'No',
-    email: payload.email ?? null,
-    role: payload.role ?? null,
-    stage: payload.stage ?? null,
-    before: payload.before ?? null,
-    shift: payload.shift ?? null,
-    after: payload.after ?? null,
-    status: payload.status ?? 'Pending Review',
-    created_at: payload.date ?? new Date().toISOString(),
-  };
 }
 
 function readinessRow(payload) {
@@ -328,29 +320,12 @@ export async function fetchAllRows(tableName, { orderBy = 'created_at', ascendin
 
 export async function createTestimonial(payload) {
   const supabase = assertSupabaseClient();
-  const tableName = env.supabaseTestimonialsTable;
-  const row = testimonialRow(payload);
 
   try {
-    const { data, error } = await withTimeout(
-      supabase
-        .from(tableName)
-        .insert(row)
-        .select('*')
-        .single(),
-      30000
-    );
-
-    if (error) {
-      return debugInsert({
-        tableName,
-        row,
-        error,
-        fallbackMessage: 'Failed to create testimonial.',
-      });
-    }
-
-    return mapTestimonial(data);
+    const { data, error } = await withTimeout(supabase.functions.invoke('submit-testimonial', { body: payload }), 30000);
+    handleSupabaseError(error, 'Failed to create testimonial.');
+    if (data?.error) throw new Error(data.error);
+    return mapTestimonial(data?.testimonial || data);
   } catch (err) {
     handleSupabaseError(err, 'Failed to create testimonial.');
   }

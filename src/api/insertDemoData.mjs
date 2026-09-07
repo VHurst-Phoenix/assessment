@@ -45,7 +45,7 @@ async function insertDemoData() {
         context: 'Q2 Performance Assessment',
         responses: { communication: 8, leadership: 7, technical: 9 },
         score: 24,
-        archetype: 'The Achiever'
+        archetype: 'executor'
       }
     );
     console.log('✓ Assessment added');

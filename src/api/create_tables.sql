@@ -40,6 +40,13 @@ CREATE TABLE IF NOT EXISTS public.testimonials (
   email TEXT,
   role TEXT,
   stage TEXT,
+  segment TEXT,
+  band TEXT,
+  band_source TEXT DEFAULT 'self-reported',
+  show_band BOOLEAN DEFAULT true,
+  matched_assessment_id BIGINT,
+  before_band TEXT,
+  after_band TEXT,
   before TEXT,
   shift TEXT,
   after TEXT,
@@ -48,6 +55,13 @@ CREATE TABLE IF NOT EXISTS public.testimonials (
 );
 
 ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS segment TEXT;
+ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS band TEXT;
+ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS band_source TEXT DEFAULT 'self-reported';
+ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS show_band BOOLEAN DEFAULT true;
+ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS matched_assessment_id BIGINT;
+ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS before_band TEXT;
+ALTER TABLE public.testimonials ADD COLUMN IF NOT EXISTS after_band TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_testimonials_status ON public.testimonials(status);
 CREATE INDEX IF NOT EXISTS idx_testimonials_created_at ON public.testimonials(created_at);
@@ -125,15 +139,22 @@ ALTER TABLE public.testimonials ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.readiness ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.execution_forms ENABLE ROW LEVEL SECURITY;
 
--- Recreate the application policies every time this migration runs. The former
--- "IF NOT EXISTS" approach left old policy definitions in place, which can
--- continue rejecting inserts even after this file is updated.
-DROP POLICY IF EXISTS public_submit_assessments ON public.assessments;
-DROP POLICY IF EXISTS admin_manage_assessments ON public.assessments;
-DROP POLICY IF EXISTS public_submit_testimonials ON public.testimonials;
-DROP POLICY IF EXISTS admin_manage_testimonials ON public.testimonials;
-DROP POLICY IF EXISTS admin_manage_readiness ON public.readiness;
-DROP POLICY IF EXISTS admin_manage_execution_forms ON public.execution_forms;
+-- Remove every pre-existing policy before recreating the application's
+-- allow-list. Policy names are mutable, so dropping only known names can leave
+-- an old public SELECT policy in place and expose assessment records.
+DO $$
+DECLARE
+  policy_record RECORD;
+BEGIN
+  FOR policy_record IN
+    SELECT tablename, policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename IN ('assessments', 'testimonials', 'readiness', 'execution_forms')
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', policy_record.policyname, policy_record.tablename);
+  END LOOP;
+END $$;
 
 -- Public forms need INSERT only. Neither the anon key nor a regular signed-in
 -- participant can read, modify, or delete submitted client data.
