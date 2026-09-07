@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { createAssessment } from '../api/dbClient'
+import { getClarityScore, getRawTotal, getScoringBand } from './scoringBands'
 
 const dimensions = [
   'Strengths & Skills',
@@ -93,12 +94,13 @@ export default function Assessment() {
   }
 
   function computeScore(items) {
-    const sum = items.reduce((total, value) => total + Number(value || 0), 0)
-    return Math.max(0, sum)
+    return getClarityScore(items)
   }
 
   async function handleSubmit() {
     const score = computeScore(answers)
+    const rawScore = getRawTotal(answers)
+    const band = getScoringBand(score)
     await createAssessment({
       firstName,
       lastName,
@@ -107,9 +109,10 @@ export default function Assessment() {
       source,
       context,
       responses: answers,
+      rawScore,
       score,
-      archetype: null,
-      createdAt: new Date().toISOString()
+      archetype: band?.key || null,
+      date: new Date().toISOString()
     })
     setSubmitted(true)
     setStep(totalQuestions + 1)
@@ -216,8 +219,8 @@ export default function Assessment() {
                 ))}
               </div>
               <div className="scale-ends">
-                <span>1 = Rarely</span>
-                <span>5 = Consistently</span>
+                <span>1 = Strongly Disagree</span>
+                <span>5 = Strongly Agree</span>
               </div>
             </div>
 
@@ -241,7 +244,8 @@ export default function Assessment() {
             <div className="review-row">
               <div><strong>Name:</strong> {firstName} {lastName}</div>
               <div><strong>Email:</strong> {email}</div>
-              <div><strong>Estimated clarity score:</strong> {computeScore(answers)}</div>
+              <div><strong>Raw total:</strong> {getRawTotal(answers)} / 125</div>
+              <div><strong>Clarity score:</strong> {computeScore(answers)} / 100</div>
             </div>
             <div className="form-actions">
               <button type="button" className="btn btn-secondary" onClick={handleBack}>

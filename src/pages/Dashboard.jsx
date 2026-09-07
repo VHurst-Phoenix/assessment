@@ -15,6 +15,9 @@ import {
 } from '../api/dbClient';
 import { getSupabaseClient } from '../lib/supabaseClient';
 import { downloadCsv } from '../utils/csvExport';
+import { formatPercent } from './toolScoring';
+import { getFrictionVector, getGrowthEdge, getPosition } from './scoringBands';
+import { findTestimonialMatches } from '../utils/testimonialMatching';
 import './Dashboard.css';
 
 const tableByTab = {
@@ -22,6 +25,16 @@ const tableByTab = {
   readiness: env.supabaseReadinessTable,
   execution: env.supabaseExecutionFormsTable,
   testimonials: env.supabaseTestimonialsTable,
+};
+
+const getClaritySignals = (record) => {
+  const categoryScores = record.categoryScores?.length === 5 ? record.categoryScores : record.dimScores;
+  const position = getPosition(categoryScores);
+  return {
+    position,
+    frictionVector: getFrictionVector(categoryScores, position),
+    growthEdge: getGrowthEdge(categoryScores),
+  };
 };
 
 const Dashboard = () => {
@@ -32,6 +45,8 @@ const Dashboard = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [selectedSegment, setSelectedSegment] = useState('');
+  const [approvedTestimonials, setApprovedTestimonials] = useState([]);
 
   const getData = useCallback(async () => {
     if (activeTab === 'clarity') {
@@ -77,6 +92,15 @@ const Dashboard = () => {
     };
   }, [getData]);
 
+  useEffect(() => {
+    if (activeTab !== 'clarity') return undefined;
+    let isMounted = true;
+    listTestimonials({ status: 'Approved' })
+      .then((stories) => { if (isMounted) setApprovedTestimonials(stories); })
+      .catch((err) => { if (isMounted) setError(err.message || 'Unable to load testimonial matches.'); });
+    return () => { isMounted = false; };
+  }, [activeTab]);
+
   const handleLogout = async () => {
     try {
       const { client } = getSupabaseClient();
@@ -100,14 +124,16 @@ const Dashboard = () => {
     setError('');
 
     try {
-      const rows = await fetchAllRows(tableName);
+      let rows = await fetchAllRows(tableName);
+      if (selectedSegment) rows = rows.filter((row) => row.segment === selectedSegment);
 
       if (rows.length === 0) {
         setError(`No rows found in ${tableName}.`);
         return;
       }
 
-      downloadCsv(rows, `Phoenix_${tableName}_${new Date().toISOString().slice(0, 10)}.csv`);
+      const segmentSuffix = selectedSegment ? `_${selectedSegment}` : '';
+      downloadCsv(rows, `Phoenix_${tableName}${segmentSuffix}_${new Date().toISOString().slice(0, 10)}.csv`);
     } catch (err) {
       console.error(err);
       setError(err.message || `Unable to export ${tableName}.`);
@@ -179,16 +205,17 @@ const Dashboard = () => {
     }
   };
 
-  const totalRecords = data.length;
-  const scoredRecords = data.filter(item => item.score !== undefined && item.score !== null);
-  const averageScore = data.length
+  const filteredData = selectedSegment ? data.filter((item) => item.segment === selectedSegment) : data;
+  const totalRecords = filteredData.length;
+  const scoredRecords = filteredData.filter(item => item.score !== undefined && item.score !== null);
+  const averageScore = scoredRecords.length
     ? Math.round(scoredRecords.reduce((sum, item) => sum + (Number(item.score) || 0), 0) / scoredRecords.length)
     : 0;
   const pendingTestimonials = activeTab === 'testimonials'
-    ? data.filter(item => item.status === 'Pending Review').length
+    ? filteredData.filter(item => item.status === 'Pending Review').length
     : 0;
-  const latestRecord = data.length
-    ? data.slice().sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+  const latestRecord = filteredData.length
+    ? filteredData.slice().sort((a, b) => new Date(b.date) - new Date(a.date))[0]
     : null;
 
   const tabs = [
@@ -206,7 +233,7 @@ const Dashboard = () => {
         <p>Review assessment records, export client data, and manage stories from one focused workspace.</p>
         <div className="admin-actions" style={{ marginTop: '12px' }}>
           <button onClick={exportAllRowsToCsv} className="btn btn-gold" disabled={isExporting}>
-            {isExporting ? 'Exporting...' : `Export all ${activeTab}`}
+            {isExporting ? 'Exporting...' : `Export ${selectedSegment || 'all'} ${activeTab}`}
           </button>
           <button onClick={handleLogout} className="btn btn-secondary">Logout</button>
         </div>
@@ -225,7 +252,7 @@ const Dashboard = () => {
             {activeTab === 'testimonials'
               ? pendingTestimonials
               : activeTab === 'clarity'
-                ? `${Number.isFinite(averageScore) ? averageScore : 0} / 125`
+                ? `${Number.isFinite(averageScore) ? averageScore : 0} / 100`
                 : `${Number.isFinite(averageScore) ? averageScore : 0}%`}
           </strong>
         </div>
@@ -248,6 +275,16 @@ const Dashboard = () => {
         ))}
       </div>
 
+      <div className="admin-filter-row">
+        <label htmlFor="dashboard-segment">Segment</label>
+        <select id="dashboard-segment" value={selectedSegment} onChange={(event) => setSelectedSegment(event.target.value)}>
+          <option value="">All segments</option>
+          <option value="Individual">Individual</option>
+          <option value="Corporate">Corporate</option>
+          <option value="Federal">Federal</option>
+        </select>
+      </div>
+
       <div className="admin-table-card">
         {error && (
           <div className="admin-error" role="alert">
@@ -267,9 +304,16 @@ const Dashboard = () => {
               <th>ID</th>
               <th>Date</th>
               <th>Name</th>
+              <th>Segment</th>
               {(activeTab === 'clarity' || activeTab === 'readiness' || activeTab === 'execution') && <th>Score</th>}
               {activeTab === 'clarity' && <th>Scoring Band</th>}
-              {activeTab === 'testimonials' && <th>Stage</th>}
+              {activeTab === 'clarity' && <th>Position</th>}
+              {activeTab === 'clarity' && <th>Friction Vector</th>}
+              {activeTab === 'clarity' && <th>Growth Edge</th>}
+              {activeTab === 'clarity' && <th>Story Matches</th>}
+              {(activeTab === 'readiness' || activeTab === 'execution') && <th>Band</th>}
+              {(activeTab === 'readiness' || activeTab === 'execution') && <th>Gap</th>}
+              {activeTab === 'testimonials' && <th>Band</th>}
               {activeTab === 'testimonials' && <th>Status</th>}
               <th>Actions</th>
             </tr>
@@ -284,7 +328,7 @@ const Dashboard = () => {
                   </div>
                 </td>
               </tr>
-            ) : data.length === 0 ? (
+            ) : filteredData.length === 0 ? (
               <tr>
                 <td colSpan="8">
                   <div className="admin-empty">
@@ -294,7 +338,15 @@ const Dashboard = () => {
                 </td>
               </tr>
             ) : (
-              data.map(item => (
+              filteredData.map(item => {
+                const signals = activeTab === 'clarity' ? getClaritySignals(item) : null;
+                const testimonialMatches = activeTab === 'clarity'
+                  ? findTestimonialMatches({ band: item.archetypeName || item.archetype, segment: item.segment }, approvedTestimonials)
+                  : null;
+                const matchCount = testimonialMatches
+                  ? testimonialMatches.tier1.length + testimonialMatches.tier2.length + testimonialMatches.tier3.length
+                  : 0;
+                return (
                 <tr key={item.id}>
                   <td>{item.id}</td>
                   <td>{new Date(item.date).toLocaleDateString()}</td>
@@ -307,15 +359,34 @@ const Dashboard = () => {
                       {item.firstName} {item.lastName}
                     </Link>
                   </td>
+                  <td>{item.segment || '—'}</td>
                   {(activeTab === 'clarity' || activeTab === 'readiness' || activeTab === 'execution') && (
                     <td>
                       <span className="score-badge">
-                        {activeTab === 'clarity' ? `${item.score} / 125` : `${item.score}%`}
+                        {activeTab === 'clarity'
+                          ? `${item.score ?? '—'} / 100`
+                          : item.score === null || item.score === undefined
+                            ? '—'
+                            : formatPercent(item.score)}
                       </span>
                     </td>
                   )}
                   {activeTab === 'clarity' && <td>{item.archetypeName || item.archetype}</td>}
-                  {activeTab === 'testimonials' && <td>{item.stage}</td>}
+                  {activeTab === 'clarity' && <td>{signals?.position?.quadrant || '—'}</td>}
+                  {activeTab === 'clarity' && <td>{signals?.frictionVector?.archetype || '—'}</td>}
+                  {activeTab === 'clarity' && <td>{signals?.growthEdge ? `#${signals.growthEdge.index + 1}` : '—'}</td>}
+                  {activeTab === 'clarity' && (
+                    <td>
+                      {matchCount ? (
+                        <span title="Approved testimonial recommendations, ranked by band and segment match">
+                          T1 {testimonialMatches.tier1.length} · T2 {testimonialMatches.tier2.length} · T3 {testimonialMatches.tier3.length}
+                        </span>
+                      ) : 'No match'}
+                    </td>
+                  )}
+                  {(activeTab === 'readiness' || activeTab === 'execution') && <td>{item.band || '—'}</td>}
+                  {(activeTab === 'readiness' || activeTab === 'execution') && <td>{item.gap || '—'}</td>}
+                  {activeTab === 'testimonials' && <td>{item.band || '—'} <small>({item.bandSource || 'self-reported'})</small></td>}
                   {activeTab === 'testimonials' && (
                     <td>
                       <span className={`status-pill status-${(item.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
@@ -343,7 +414,8 @@ const Dashboard = () => {
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

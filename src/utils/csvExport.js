@@ -12,6 +12,10 @@ function escapeCsvValue(value) {
     return `"${stringValue.replace(/"/g, '""')}"`;
   }
 
+  if (/^[=+\-@]/.test(stringValue)) {
+    return `'${stringValue}`;
+  }
+
   return stringValue;
 }
 

@@ -54,9 +54,9 @@ const ClientStoriesPage = () => {
                     {story.role && <p className="story-role">{story.role}</p>}
                   </div>
                 </div>
-                {story.stage && (
+                {story.showBand && story.band && (
                   <span className="story-badge">
-                    {story.stage}
+                    {story.band}
                   </span>
                 )}
               </div>

@@ -162,6 +162,16 @@
   font-weight: 700;
 }
 
+.assessment-submit-success {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(45, 106, 79, 0.24);
+  border-radius: 8px;
+  background: #EAF4EF;
+  color: #2D6A4F;
+  font-weight: 700;
+}
+
 @keyframes intakeCardEntry {
   from { opacity: 0; transform: translateY(24px); }
   to { opacity: 1; transform: translateY(0); }

@@ -120,6 +120,7 @@ export async function sendEmailViaSupabaseFunction({
   replyTo,
   bcc,
   cc,
+  signal,
 }) {
   const functionUrl = buildSupabaseEdgeFunctionUrl(env.emailFunctionUrl || env.supabaseUrl, 'send-email');
   if (!functionUrl) {
@@ -142,6 +143,7 @@ export async function sendEmailViaSupabaseFunction({
     const response = await fetch(functionUrl, {
       method: 'POST',
       mode: 'cors',
+      signal,
       headers,
       body: JSON.stringify({
         to: normalizeRecipients(to),

@@ -109,6 +109,25 @@
   overflow-x: auto;
 }
 
+.admin-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 18px;
+  color: var(--navy);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.admin-filter-row select {
+  min-width: 180px;
+  padding: 9px 12px;
+  border: 1px solid var(--ivory-dark);
+  border-radius: 7px;
+  background: var(--white);
+  color: var(--charcoal);
+}
+
 .admin-tab-btn {
   border: 0;
   background: transparent;

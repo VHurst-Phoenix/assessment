@@ -18,7 +18,7 @@ async function main() {
     context: 'Test',
     responses: [],
     score: 50,
-    archetype: 'awakening'
+    archetype: 'strategist'
   };
 
   try {

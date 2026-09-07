@@ -7,3 +7,8 @@ project_id = "lmaiextwuqylbfxxqgwn"
 # Allow unauthenticated browser calls from the assessment app.
 # The email function itself still validates required payload fields.
 verify_jwt = false
+
+[functions.submit-testimonial]
+# The function validates its small public form payload and performs the
+# protected Clarity-record lookup with the server-side service-role key.
+verify_jwt = false

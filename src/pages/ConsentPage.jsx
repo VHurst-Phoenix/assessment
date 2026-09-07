@@ -1,13 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { recordConsent } from '../lib/consent';
 import './ConsentPage.css';
-
-const CONSENT_KEY = 'phoenix_consent_accepted';
-
-/** Check whether the user has already given consent this session. */
-export function hasConsented() {
-  return sessionStorage.getItem(CONSENT_KEY) === 'true';
-}
 
 const ConsentPage = () => {
   const navigate = useNavigate();
@@ -36,7 +30,7 @@ const ConsentPage = () => {
       return;
     }
 
-    sessionStorage.setItem(CONSENT_KEY, 'true');
+    recordConsent();
     navigate(redirectTo, { replace: true });
   };
 

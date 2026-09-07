@@ -48,24 +48,29 @@ const mockData = {
   firstName: 'Adeola',
   email: TO_EMAIL || 'test@example.com',
   score: 74,
-  archetype: 'phoenix_momentum',
-  dimScores: [19, 17, 16, 18, 15], // out of 25 each
+  archetype: 'executor',
+  dimScores: [15.2, 13.6, 12.8, 14.4, 12], // normalized, each out of 20
 };
 
 /* ── HTML builder (inline — mirrors emailService.js) ── */
 const archetypes = {
-  phoenix_momentum: {
-    name: 'Phoenix Momentum',
+  phoenix: {
+    name: 'Phoenix',
     directRead:
       "Your scores reveal something most people in your position never get told.\n\nYou have done the hard work of figuring it out. The direction is real. The building is happening. What your scores show is that the gap right now isn't capability or clarity — it's the faith to trust what you're building before the results are fully visible. That is one of the hardest phases of any transformation. Most people stop here because they can't see the proof yet. The Clarity Intensive is where we map exactly what the next chapter requires — and build the conviction to see it through.\n\nBook it.",
   },
-  dreaming: {
-    name: 'Dreaming',
+  strategist: {
+    name: 'Strategist',
     directRead:
       "Your scores reveal something most people in your position never get told.\n\nYou are not stuck because you lack clarity — you scored well there. You are stuck because some part of you does not yet believe you are allowed to have what you can see. That is a specific, identifiable pattern. I have seen it in dozens of high-achievers at exactly this stage, and I know what breaks it. It is not more planning. It is not more journaling. It is one direct conversation where someone who can see the pattern names it out loud.\n\nThat conversation is the Clarity Intensive. Book it.",
   },
-  awakening: {
-    name: 'Awakening',
+  executor: {
+    name: 'Executor',
+    directRead:
+      "Your scores reveal something most people in your position never get told.\n\nThis is the season where belief becomes behavior. Your remaining challenge is focus: choosing the right moves, protecting your energy, and staying consistent when things feel fast or uncertain.\n\nThe Clarity Intensive helps you lock in your next step so you can keep rising with less doubt and more momentum.\n\nBook it.",
+  },
+  transitioner: {
+    name: 'Transitioner',
     directRead:
       "Your scores reveal something most people in your position never get told.\n\nYou are not behind. You are not broken. You are in the middle of one of the most significant transitions a professional can go through — and you are navigating it without a map. The discomfort is not a signal that something is wrong. It is a signal that something real is happening. What you need right now is not a plan. It is a space where someone who has been exactly where you are can help you see what's actually shifting.\n\nThat space is the Clarity Intensive. Book it.",
   },
@@ -76,13 +81,13 @@ const dimPhases = ['See It', 'Believe It', 'Achieve It', 'Alignment', 'Readiness
 
 function buildEmailHTML(data) {
   const score = data.score ?? 0;
-  const archetype = archetypes[data.archetype] || archetypes.awakening;
+  const archetype = archetypes[data.archetype] || archetypes.transitioner;
   const dimScores = data.dimScores || [0, 0, 0, 0, 0];
 
   const dimensionRows = dimScores
     .map((rawScore, idx) => {
-      const pct = Math.round((rawScore / 25) * 100);
-      const scaledOf20 = Math.round((rawScore / 25) * 20);
+      const pct = Math.round((rawScore / 20) * 100);
+      const scaledOf20 = rawScore;
       const statusText = pct >= 72 ? 'Active' : pct >= 52 ? 'Developing' : 'Emerging';
       const statusBg = pct >= 72 ? '#EAF4EF' : pct >= 52 ? '#FBF8E8' : '#FAECEE';
       const statusColor = pct >= 72 ? '#2D6A4F' : pct >= 52 ? '#B08A00' : '#8B2635';
@@ -115,7 +120,7 @@ function buildEmailHTML(data) {
         <tr><td style="padding:24px;text-align:center;">
           <div style="font-size:11px;font-weight:800;color:#6B6B7B;text-transform:uppercase;margin-bottom:8px;">YOUR CLARITY SCORE</div>
           <span style="font-size:56px;font-family:Georgia,serif;color:#0D1028;font-weight:700;">${score}</span>
-          <span style="font-size:16px;color:#6B6B7B;"> / 125</span><br><br>
+          <span style="font-size:16px;color:#6B6B7B;"> / 100</span><br><br>
           <div style="display:inline-block;background:#0D1028;color:#D4A056;font-size:14px;font-weight:700;padding:8px 24px;border-radius:30px;">${archetype.name}</div>
         </td></tr>
       </table>
@@ -147,8 +152,8 @@ async function main() {
   console.log('  From    :', FROM_EMAIL || '❌ MISSING');
   console.log('  To      :', TO_EMAIL || '(dry run — pass recipient as CLI arg)');
   console.log('  Archetype:', mockData.archetype);
-  console.log('  Score   :', mockData.score, '/ 125');
-  console.log('  DimScores:', mockData.dimScores.join(', '), '(each /25)\n');
+  console.log('  Score   :', mockData.score, '/ 100');
+  console.log('  DimScores:', mockData.dimScores.join(', '), '(each /20)\n');
 
   if (!TO_EMAIL) {
     console.log('ℹ️  No recipient supplied — printing HTML preview only.\n');
@@ -181,7 +186,7 @@ async function main() {
       to: [TO_EMAIL],
       subject: '[TEST] Your Personal Phoenix Clarity Assessment Report',
       html: buildEmailHTML(mockData),
-      text: `Dear ${mockData.firstName},\n\nYour clarity score: ${mockData.score}/100\nArchetype: Phoenix Momentum\n\nBook your session: https://www.phoenixclearinsight.com/book`,
+      text: `Dear ${mockData.firstName},\n\nYour clarity score: ${mockData.score}/100\nBand: Executor\n\nBook your session: https://www.phoenixclearinsight.com/book`,
     }),
   });
 

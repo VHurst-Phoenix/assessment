@@ -41,8 +41,8 @@ const assessmentPayload = {
   lastName: 'Test',
   email: recipient,
   score: 74,
-  archetype: 'phoenix_momentum',
-  dimScores: [19, 17, 16, 18, 15],
+  archetype: 'executor',
+  dimScores: [15.2, 13.6, 12.8, 14.4, 12],
 };
 
 async function main() {
