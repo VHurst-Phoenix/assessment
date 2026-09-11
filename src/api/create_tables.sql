@@ -164,6 +164,14 @@ CREATE POLICY public_submit_assessments ON public.assessments
 CREATE POLICY public_submit_testimonials ON public.testimonials
   AS PERMISSIVE FOR INSERT TO anon, authenticated WITH CHECK (true);
 
+-- Readiness and execution assessments are opened with the shared passcode in
+-- the assessment portal. The browser submits their completed forms directly.
+CREATE POLICY public_submit_readiness ON public.readiness
+  AS PERMISSIVE FOR INSERT TO anon, authenticated WITH CHECK (true);
+
+CREATE POLICY public_submit_execution_forms ON public.execution_forms
+  AS PERMISSIVE FOR INSERT TO anon, authenticated WITH CHECK (true);
+
 -- Coach-console access is granted only to a Supabase user with this app
 -- metadata claim. Set it through the service-role admin API, never the client.
 CREATE POLICY admin_manage_assessments ON public.assessments

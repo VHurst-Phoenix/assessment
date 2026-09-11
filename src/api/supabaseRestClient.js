@@ -165,7 +165,20 @@ export function mapExecutionForm(row) {
   };
 }
 
-function assessmentRow(payload, { includeDimScores = true } = {}) {
+const OPTIONAL_ASSESSMENT_COLUMNS = ['raw_score', 'dim_scores'];
+// These were added after the original client-stories table. Keeping them
+// optional lets the form work while an older hosted schema is being migrated.
+const OPTIONAL_TESTIMONIAL_COLUMNS = [
+  'segment',
+  'band',
+  'band_source',
+  'show_band',
+  'matched_assessment_id',
+  'before_band',
+  'after_band',
+];
+
+function assessmentRow(payload, omittedColumns = new Set()) {
   const row = {
     first_name: payload.firstName,
     last_name: payload.lastName,
@@ -176,7 +189,6 @@ function assessmentRow(payload, { includeDimScores = true } = {}) {
     source: payload.source ?? null,
     context: payload.context ?? null,
     responses: payload.answers ?? payload.responses ?? [],
-    raw_score: Number(payload.rawScore ?? getRawTotal(payload.answers ?? payload.responses ?? [])),
     score: Number(payload.score ?? 0),
     archetype: payload.archetype ?? null,
     consent_timestamp: payload.consentTimestamp ?? null,
@@ -184,7 +196,11 @@ function assessmentRow(payload, { includeDimScores = true } = {}) {
     created_at: payload.date ?? new Date().toISOString(),
   };
 
-  if (includeDimScores) {
+  if (!omittedColumns.has('raw_score')) {
+    row.raw_score = Number(payload.rawScore ?? getRawTotal(payload.answers ?? payload.responses ?? []));
+  }
+
+  if (!omittedColumns.has('dim_scores')) {
     row.dim_scores = Array.isArray(payload.dimScores) ? payload.dimScores : null;
   }
 
@@ -228,6 +244,42 @@ function executionFormRow(payload) {
   };
 }
 
+function testimonialRow(payload, omittedColumns = new Set()) {
+  const band = payload.band?.trim() || null;
+
+  const row = {
+    first_name: payload.firstName?.trim(),
+    last_name: payload.lastName?.trim(),
+    email: payload.email?.trim().toLowerCase(),
+    role: payload.role?.trim() || null,
+    anonymous: payload.anonymous === 'Yes' ? 'Yes' : 'No',
+    // A browser submission cannot safely read assessment history, so this is
+    // explicitly self-reported instead of being marked as verified.
+    stage: band,
+    before: payload.before?.trim(),
+    shift: payload.shift?.trim(),
+    after: payload.after?.trim(),
+    status: payload.status ?? 'Pending Review',
+    created_at: payload.date ?? new Date().toISOString(),
+  };
+
+  const matchingFields = {
+    segment: payload.segment?.trim() || null,
+    band,
+    band_source: 'self-reported',
+    show_band: payload.showBand !== false,
+    matched_assessment_id: null,
+    before_band: null,
+    after_band: band,
+  };
+
+  for (const [column, value] of Object.entries(matchingFields)) {
+    if (!omittedColumns.has(column)) row[column] = value;
+  }
+
+  return row;
+}
+
 export async function createAssessment(payload, { signal } = {}) {
   const supabase = assertSupabaseClient();
 
@@ -246,14 +298,26 @@ export async function createAssessment(payload, { signal } = {}) {
   };
 
   try {
-    let { data, error } = await withTimeout(insertAssessment(assessmentRow(payload)), 30000);
+    const omittedColumns = new Set();
+    let data;
+    let error;
 
-    if (isMissingColumnError(error, 'dim_scores')) {
-      console.warn('[supabaseRestClient] Supabase assessments table is missing dim_scores column. Retrying assessment insert without optional dimension scores.', {
+    while (true) {
+      ({ data, error } = await withTimeout(insertAssessment(assessmentRow(payload, omittedColumns)), 30000));
+
+      if (!error) break;
+
+      const missingColumn = OPTIONAL_ASSESSMENT_COLUMNS.find(
+        (column) => !omittedColumns.has(column) && isMissingColumnError(error, column)
+      );
+
+      if (!missingColumn) break;
+
+      omittedColumns.add(missingColumn);
+      console.warn(`[supabaseRestClient] Supabase assessments table is missing ${missingColumn} column. Retrying assessment insert without it.`, {
         originalError: error?.message,
         timestamp: new Date().toISOString(),
       });
-      ({ data, error } = await withTimeout(insertAssessment(assessmentRow(payload, { includeDimScores: false })), 30000));
     }
 
     handleSupabaseError(error, `Failed to create assessment in ${env.supabaseAssessmentsTable}.`);
@@ -321,11 +385,37 @@ export async function fetchAllRows(tableName, { orderBy = 'created_at', ascendin
 export async function createTestimonial(payload) {
   const supabase = assertSupabaseClient();
 
+  const insertTestimonial = (row) => supabase
+    .from(env.supabaseTestimonialsTable)
+    .insert(row)
+    .select('*')
+    .single();
+
   try {
-    const { data, error } = await withTimeout(supabase.functions.invoke('submit-testimonial', { body: payload }), 30000);
+    const omittedColumns = new Set();
+    let data;
+    let error;
+
+    while (true) {
+      ({ data, error } = await withTimeout(insertTestimonial(testimonialRow(payload, omittedColumns)), 30000));
+
+      if (!error) break;
+
+      const missingColumn = OPTIONAL_TESTIMONIAL_COLUMNS.find(
+        (column) => !omittedColumns.has(column) && isMissingColumnError(error, column)
+      );
+
+      if (!missingColumn) break;
+
+      omittedColumns.add(missingColumn);
+      console.warn(`[supabaseRestClient] Supabase testimonials table is missing ${missingColumn} column. Retrying testimonial insert without it.`, {
+        originalError: error?.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     handleSupabaseError(error, 'Failed to create testimonial.');
-    if (data?.error) throw new Error(data.error);
-    return mapTestimonial(data?.testimonial || data);
+    return mapTestimonial(data);
   } catch (err) {
     handleSupabaseError(err, 'Failed to create testimonial.');
   }

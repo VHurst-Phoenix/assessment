@@ -375,6 +375,21 @@
   margin-top: 4px;
 }
 
+.coach-lock-actions input {
+  width: 100%;
+  border: 1px solid var(--ivory-dark);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font: inherit;
+  color: var(--navy);
+  background: var(--ivory);
+}
+
+.coach-lock-actions input:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
 .coach-lock-cancel-btn {
   display: inline-flex;
   align-items: center;

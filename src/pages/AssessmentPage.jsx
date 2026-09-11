@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { createAssessment, createReadiness, createExecutionForm, createTestimonial } from '../api/dbClient';
 import {
   clarityDimensions,
@@ -11,14 +11,20 @@ import { getCategoryScores, getClarityScore, getRawTotal, getScoringBand } from 
 import { getExecutionResults, getReadinessResults } from './toolScoring';
 import { getAssessmentPath, getAssessmentTab } from './assessmentRoutes';
 import { hasConsented, CLARITY_CONSENT_VERSION } from '../lib/consent';
-import { useAuth } from '../hooks/useAuth';
 import './AssessmentPage.css';
+
+const TOOL_ASSESSMENT_PASSCODE = 'Accomplished26!';
+const toolAccessStorageKey = (type) => `phoenix-${type}-assessment-access`;
 
 const AssessmentPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const activeTab = getAssessmentTab(location);
+  const [unlockedTools, setUnlockedTools] = useState(() => ['readiness', 'execution'].filter(
+    (type) => window.sessionStorage.getItem(toolAccessStorageKey(type)) === 'granted'
+  ));
+  const [passcode, setPasscode] = useState('');
+  const [passcodeError, setPasscodeError] = useState('');
 
   // Only the public Clarity assessment uses the digital consent screen.
   if (activeTab === 'clarity' && !hasConsented()) {
@@ -46,28 +52,34 @@ const AssessmentPage = () => {
     if (type === 'execution') {
       return {
         icon: '📈',
-        title: 'Locked Review',
-        subtitle: 'Week 3+ · Coach Only',
-        description: 'This form tracks client action consistency, homework completion, and milestone alignment. Reserved for active program coaches.',
-        btnLabel: 'Sign in as Coach',
+        title: 'Execution Assessment',
+        subtitle: 'Week 3+ · Passcode Required',
+        description: 'Enter the assessment passcode to review client action consistency, homework completion, and milestone alignment.',
       };
     }
     return {
       icon: '🔑',
-      title: 'Locked Access',
-      subtitle: 'Pre-Intake · Coach Only',
-      description: 'This form evaluates a prospective client\'s emotional readiness and bandwidth before enrolling them into the program.',
-      btnLabel: 'Sign in as Coach',
+      title: 'Readiness Assessment',
+      subtitle: 'Pre-Intake · Passcode Required',
+      description: 'Enter the assessment passcode to evaluate a prospective client\'s emotional readiness and bandwidth before enrollment.',
     };
   };
 
-  if (activeTab === 'readiness' || activeTab === 'execution') {
-    if (isAuthLoading) {
-      return <div className="container"><div className="card"><p>Checking coach access…</p></div></div>;
+  const unlockToolAssessment = (event, type) => {
+    event.preventDefault();
+    if (passcode !== TOOL_ASSESSMENT_PASSCODE) {
+      setPasscodeError('That passcode is incorrect. Please try again.');
+      return;
     }
 
-    const isCoach = isAuthenticated && user?.app_metadata?.role === 'admin';
-    if (isCoach) {
+    window.sessionStorage.setItem(toolAccessStorageKey(type), 'granted');
+    setUnlockedTools((current) => current.includes(type) ? current : [...current, type]);
+    setPasscode('');
+    setPasscodeError('');
+  };
+
+  if (activeTab === 'readiness' || activeTab === 'execution') {
+    if (unlockedTools.includes(activeTab)) {
       return (
         <div className="animate-fade-slide">
           <GenericAssessment
@@ -95,20 +107,27 @@ const AssessmentPage = () => {
           <div className="coach-lock-subtitle">{lock.subtitle}</div>
           <h3>{lock.title}</h3>
           <p>{lock.description}</p>
-          <div className="coach-lock-actions">
+          <form className="coach-lock-actions" onSubmit={(event) => unlockToolAssessment(event, activeTab)}>
+            <label className="sr-only" htmlFor="tool-assessment-passcode">Assessment passcode</label>
+            <input
+              id="tool-assessment-passcode"
+              type="password"
+              value={passcode}
+              onChange={(event) => {
+                setPasscode(event.target.value);
+                setPasscodeError('');
+              }}
+              placeholder="Enter passcode"
+              autoComplete="current-password"
+              autoFocus
+              required
+            />
+            {passcodeError && <div className="coach-lock-error" role="alert">{passcodeError}</div>}
+            <button type="submit" className="btn btn-primary scale-on-hover" style={{ width: '100%' }}>Open Assessment</button>
             <button type="button" className="coach-lock-cancel-btn" onClick={handleBack}>
               Cancel
             </button>
-            <button type="button" onClick={() => navigate('/login', { state: { from: location } })} className="btn btn-primary scale-on-hover" style={{ width: '100%' }}>{lock.btnLabel}</button>
-          </div>
-          <div className="coach-lock-footer">
-            <p>Don't have an account?</p>
-            <div className="coach-lock-footer-links">
-              <Link to="/assessment">Take a free assessment</Link>
-              <span>or</span>
-              <Link to="/login">Request Access</Link>
-            </div>
-          </div>
+          </form>
         </div>
       </div>
     );
@@ -131,13 +150,13 @@ const AssessmentPage = () => {
         };
       case 'readiness':
         return {
-          label: "Coach Evaluation",
+          label: "Passcode-Protected Assessment",
           title: <>Client <em>Readiness</em></>,
           desc: "Evaluate the client's capacity, emotional baseline, and commitment to the coaching journey."
         };
       case 'execution':
         return {
-          label: "Coach Evaluation",
+          label: "Passcode-Protected Assessment",
           title: <>Client <em>Execution</em></>,
           desc: "Assess the client's progress, homework completion, and action alignment."
         };
@@ -171,7 +190,7 @@ const AssessmentPage = () => {
           className={`tab-btn ${activeTab === 'readiness' ? 'active' : ''}`} 
           onClick={() => handleTabChange('readiness')}
         >
-          Readiness assessment <span className="tab-badge">Coach</span>
+          Readiness assessment <span className="tab-badge">Passcode</span>
         </button>
         <button 
           className={`tab-btn ${activeTab === 'execution' ? 'active' : ''}`} 
@@ -827,10 +846,10 @@ const TestimonialForm = ({ navigate }) => {
           </div>
 
           <div className="form-group">
-            <label>Email (For follow-up and private Clarity Band matching, never displayed)</label>
+            <label>Email (For follow-up only; never displayed)</label>
             <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
             <small style={{ color: 'var(--muted)', display: 'block', marginTop: 6 }}>
-              We use your email privately to match your prior Clarity Assessment results. It is never shown with your story.
+              Your email is only used for follow-up and is never shown with your story.
             </small>
           </div>
 
@@ -840,7 +859,7 @@ const TestimonialForm = ({ navigate }) => {
                   <input type="text" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} />
                 </div>
                 <div className="form-group">
-                  <label>Clarity Band <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(only if we cannot verify it)</span></label>
+                  <label>Clarity Band <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
                   <select value={formData.band} onChange={e => setFormData({...formData, band: e.target.value})}>
                     <option value="">Select Band...</option>
                     <option value="Transitioner">Transitioner</option>
