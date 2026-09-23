@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { recordConsent } from '../lib/consent';
+import { recordConsent, recordToolConsent } from '../lib/consent';
 import './ConsentPage.css';
 
 const ConsentPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('next') || '/assessment';
+  const tool = searchParams.get('tool');
 
   const [agreed, setAgreed] = useState({
     dataCollection: false,
@@ -30,7 +31,11 @@ const ConsentPage = () => {
       return;
     }
 
-    recordConsent();
+    if (tool === 'readiness' || tool === 'execution') {
+      recordToolConsent(tool);
+    } else {
+      recordConsent();
+    }
     navigate(redirectTo, { replace: true });
   };
 

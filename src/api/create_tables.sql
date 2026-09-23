@@ -81,6 +81,8 @@ CREATE TABLE IF NOT EXISTS public.readiness (
   responses JSONB,           -- full array of coach rating answers
   session_type TEXT,         -- e.g. 'clarity-intensive' | 'week1'
   session_date DATE,         -- date of the session being evaluated
+  consent_timestamp TIMESTAMP WITH TIME ZONE,
+  consent_version TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
@@ -93,6 +95,8 @@ ALTER TABLE public.readiness ADD COLUMN IF NOT EXISTS segment TEXT;
 ALTER TABLE public.readiness ADD COLUMN IF NOT EXISTS category_scores JSONB;
 ALTER TABLE public.readiness ADD COLUMN IF NOT EXISTS band TEXT;
 ALTER TABLE public.readiness ADD COLUMN IF NOT EXISTS gap TEXT;
+ALTER TABLE public.readiness ADD COLUMN IF NOT EXISTS consent_timestamp TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.readiness ADD COLUMN IF NOT EXISTS consent_version TEXT;
 ALTER TABLE public.readiness ALTER COLUMN score TYPE NUMERIC(5,2) USING score::NUMERIC;
 
 CREATE INDEX IF NOT EXISTS idx_readiness_email ON public.readiness(email);
@@ -114,6 +118,8 @@ CREATE TABLE IF NOT EXISTS public.execution_forms (
   responses JSONB,
   status TEXT DEFAULT 'Pending',
   notes TEXT,
+  consent_timestamp TIMESTAMP WITH TIME ZONE,
+  consent_version TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
@@ -125,6 +131,8 @@ ALTER TABLE public.execution_forms ADD COLUMN IF NOT EXISTS category_scores JSON
 ALTER TABLE public.execution_forms ADD COLUMN IF NOT EXISTS band TEXT;
 ALTER TABLE public.execution_forms ADD COLUMN IF NOT EXISTS gap TEXT;
 ALTER TABLE public.execution_forms ADD COLUMN IF NOT EXISTS program_checkpoint TEXT;
+ALTER TABLE public.execution_forms ADD COLUMN IF NOT EXISTS consent_timestamp TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.execution_forms ADD COLUMN IF NOT EXISTS consent_version TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_execution_forms_email ON public.execution_forms(email);
 CREATE INDEX IF NOT EXISTS idx_execution_forms_status ON public.execution_forms(status);
