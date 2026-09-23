@@ -1,16 +1,15 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { createAssessment, createReadiness, createExecutionForm, createTestimonial } from '../api/dbClient';
+import { createAssessment, createTestimonial } from '../api/dbClient';
+import ReadinessAssessment from './ReadinessAssessment';
+import ExecutionAssessment from './ExecutionAssessment';
 import {
   clarityDimensions,
   clarityQuestions,
-  readinessQuestions,
-  executionQuestions,
 } from './assessmentQuestions';
 import { getCategoryScores, getClarityScore, getRawTotal, getScoringBand } from './scoringBands';
-import { getExecutionResults, getReadinessResults } from './toolScoring';
 import { getAssessmentPath, getAssessmentTab } from './assessmentRoutes';
-import { hasConsented, CLARITY_CONSENT_VERSION } from '../lib/consent';
+import { hasConsented, hasToolConsented, CLARITY_CONSENT_VERSION } from '../lib/consent';
 import './AssessmentPage.css';
 
 const TOOL_ASSESSMENT_PASSCODE = 'Accomplished26!';
@@ -80,13 +79,14 @@ const AssessmentPage = () => {
 
   if (activeTab === 'readiness' || activeTab === 'execution') {
     if (unlockedTools.includes(activeTab)) {
+      if (!hasToolConsented(activeTab)) {
+        const next = encodeURIComponent(location.pathname + location.search);
+        return <Navigate to={'/consent?next=' + next + '&tool=' + activeTab} replace />;
+      }
+
       return (
         <div className="animate-fade-slide">
-          <GenericAssessment
-            title={activeTab === 'readiness' ? 'Client Readiness' : 'Client Execution'}
-            type={activeTab}
-            questions={activeTab === 'readiness' ? readinessQuestions : executionQuestions}
-          />
+          {activeTab === 'readiness' ? <ReadinessAssessment /> : <ExecutionAssessment />}
         </div>
       );
     }
@@ -215,10 +215,10 @@ const AssessmentPage = () => {
           <TestimonialForm navigate={navigate} />
         </div>
         <div style={{ display: activeTab === 'readiness' ? 'block' : 'none' }}>
-          <GenericAssessment title="Client Readiness" type="readiness" questions={readinessQuestions} />
+          <ReadinessAssessment />
         </div>
         <div style={{ display: activeTab === 'execution' ? 'block' : 'none' }}>
-          <GenericAssessment title="Client Execution" type="execution" questions={executionQuestions} />
+          <ExecutionAssessment />
         </div>
       </div>
     </div>
@@ -518,285 +518,6 @@ const ClarityAssessment = ({ navigate }) => {
           )}
         </div>
       )}
-    </>
-  );
-};
-
-const GenericAssessment = ({ title, type, questions }) => {
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    company: '',
-    segment: '',
-    sessionType: 'clarity-intensive',
-    sessionDate: '',
-    programCheckpoint: '',
-  });
-  const [consentAgreed, setConsentAgreed] = useState(false);
-  const [answers, setAnswers] = useState(Array(questions.length).fill(null));
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
-  const [submitSuccess, setSubmitSuccess] = useState('');
-  const fieldPrefix = `${type}-client`;
-  const isReadiness = type === 'readiness';
-  const scaleLabels = isReadiness
-    ? ['', 'Not at all', 'Slightly', 'Moderately', 'Very', 'Extremely']
-    : ['', 'Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'];
-
-  const calculateResults = () => isReadiness ? getReadinessResults(answers) : getExecutionResults(answers);
-
-  const handleSubmit = async (e) => {
-    e?.preventDefault?.();
-
-    if (answers.includes(null)) {
-      alert("Please answer all questions before submitting.");
-      return;
-    }
-    if (!formData.firstName || !formData.lastName || !formData.email) {
-      alert("Please complete client details.");
-      return;
-    }
-    if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
-      alert("Please enter a valid client email.");
-      return;
-    }
-    if (!consentAgreed) {
-      alert('Please confirm the Participation & Data Use Notice.');
-      return;
-    }
-    if (!isReadiness && !formData.programCheckpoint) {
-      alert('Please select the required program checkpoint.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setSubmitError('');
-    setSubmitSuccess('');
-    const results = calculateResults();
-    const data = {
-      ...formData,
-      date: new Date().toISOString(),
-      answers,
-      score: results.score,
-      categoryScores: results.categoryScores,
-      band: results.band?.label || null,
-      gap: results.gap?.archetype || null,
-    };
-
-    try {
-      if (type === 'readiness') {
-        await createReadiness(data);
-      }
-      if (type === 'execution') {
-        await createExecutionForm(data);
-      }
-
-      setSubmitSuccess(`${title} was saved successfully.`);
-      setAnswers(Array(questions.length).fill(null));
-      setFormData({
-        firstName: '',
-        lastName: '',
-        email: '',
-        company: '',
-        segment: '',
-        sessionType: 'clarity-intensive',
-        sessionDate: '',
-        programCheckpoint: '',
-      });
-    } catch (err) {
-      console.error(`Failed to persist ${type} assessment to Supabase:`, err);
-      setSubmitError(err.message || `Failed to save ${type} assessment. Your responses are still on this page.`);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <>
-      <form onSubmit={handleSubmit} noValidate>
-        <div className="card intake-card">
-          <h3>{title}</h3>
-
-          <div className="unified-form unified-client-details">
-            <div className="form-row" style={{ marginTop: '16px' }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label htmlFor={`${fieldPrefix}-first-name`}>Client First Name *</label>
-                <input
-                  id={`${fieldPrefix}-first-name`}
-                  type="text"
-                  placeholder="Client First Name"
-                  value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group" style={{ flex: 1 }}>
-                <label htmlFor={`${fieldPrefix}-last-name`}>Client Last Name *</label>
-                <input
-                  id={`${fieldPrefix}-last-name`}
-                  type="text"
-                  placeholder="Client Last Name"
-                  value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="form-group" style={{ marginTop: 12 }}>
-              <label htmlFor={`${fieldPrefix}-email`}>Client Email *</label>
-              <input
-                id={`${fieldPrefix}-email`}
-                type="email"
-                placeholder="client@email.com"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-
-            <div className="form-row" style={{ marginTop: '12px' }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label htmlFor={`${fieldPrefix}-company`}>Company / Agency Affiliation <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
-                <input
-                  id={`${fieldPrefix}-company`}
-                  type="text"
-                  placeholder="Organization name"
-                  value={formData.company}
-                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group" style={{ flex: 1 }}>
-                <label htmlFor={`${fieldPrefix}-segment`}>Segment <span className="tab-badge" style={{ marginLeft: 6, fontSize: '0.65rem' }}>New</span></label>
-                <select 
-                  id={`${fieldPrefix}-segment`}
-                  value={formData.segment} 
-                  onChange={(e) => setFormData({ ...formData, segment: e.target.value })}
-                >
-                  <option value="">Select segment...</option>
-                  <option value="Individual">Individual</option>
-                  <option value="Corporate">Corporate</option>
-                  <option value="Federal">Federal</option>
-                </select>
-              </div>
-            </div>
-
-            {isReadiness && (
-              <>
-                <div className="form-group" style={{ marginTop: 12 }}>
-                  <label htmlFor={`${fieldPrefix}-session-type`}>Session Type</label>
-                  <select
-                    id={`${fieldPrefix}-session-type`}
-                    value={formData.sessionType}
-                    onChange={(e) => setFormData({ ...formData, sessionType: e.target.value })}
-                  >
-                    <option value="clarity-intensive">Clarity Intensive ($497) - screening use</option>
-                    <option value="week1">Week 1 of Program - deepening use</option>
-                  </select>
-                </div>
-
-                <div className="form-group" style={{ marginTop: 12 }}>
-                  <label htmlFor={`${fieldPrefix}-session-date`}>Session Date</label>
-                  <input
-                    id={`${fieldPrefix}-session-date`}
-                    type="date"
-                    value={formData.sessionDate}
-                    onChange={(e) => setFormData({ ...formData, sessionDate: e.target.value })}
-                  />
-                </div>
-              </>
-            )}
-
-            {!isReadiness && (
-              <div className="form-group" style={{ marginTop: 12 }}>
-                <label htmlFor={`${fieldPrefix}-checkpoint`}>Program Checkpoint *</label>
-                <select
-                  id={`${fieldPrefix}-checkpoint`}
-                  value={formData.programCheckpoint}
-                  onChange={(e) => setFormData({ ...formData, programCheckpoint: e.target.value })}
-                  required
-                >
-                  <option value="">Select checkpoint...</option>
-                  <option value="Week 3">Week 3</option>
-                  <option value="Week 6">Week 6</option>
-                  <option value="Week 9">Week 9</option>
-                  <option value="Week 12">Week 12</option>
-                  <option value="Program Completion">Program Completion</option>
-                </select>
-              </div>
-            )}
-
-            {/* ── Participation & Data Use Notice ── */}
-            <div className="consent-notice-block">
-              <div className="consent-notice-heading">Participation &amp; Data Use Notice</div>
-              <div className="consent-notice-body">
-                <p>
-                  <strong>What we collect:</strong> your name, your email address, your organization or agency affiliation (if applicable), your Segment (Individual, Corporate, or Federal), how you identify (if you choose to share it), how you heard about Phoenix Clear Insight, your responses to the assessment questions, anything you choose to share, and any follow-up survey responses you choose to provide.
-                </p>
-                <p>
-                  <strong>How it's used:</strong> Your responses generate your scores and profile — sent to you by email and used, with your permission, to inform coaching conversations should you choose to work with us.
-                </p>
-                <p>
-                  <strong>Where it's stored:</strong> Stored securely, accessible only to Phoenix Clear Insight Consulting LLC.
-                </p>
-              </div>
-              <label className="consent-inline-checkbox" htmlFor={`${fieldPrefix}-consent`}>
-                <input
-                  id={`${fieldPrefix}-consent`}
-                  type="checkbox"
-                  checked={consentAgreed}
-                  onChange={() => setConsentAgreed(!consentAgreed)}
-                />
-                <span className="consent-inline-checkmark" />
-                <span>I have read and agree to the Participation &amp; Data Use Notice above.</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div className="assessment-questions">
-          {questions.map((q, i) => (
-            <div key={i} className="card question-card">
-              <div className="q-number">Question {i + 1}</div>
-              <div className="q-text">{q}</div>
-              <div className="scale-options">
-                {[1, 2, 3, 4, 5].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    className={`scale-btn ${answers[i] === num ? 'selected' : ''}`}
-                    onClick={() => {
-                      const newAnswers = [...answers];
-                      newAnswers[i] = num;
-                      setAnswers(newAnswers);
-                    }}
-                    aria-label={`Select ${num} for Question ${i + 1}`}
-                  >
-                    <span className="scale-num">{num}</span>
-                    <span className="scale-label">{scaleLabels[num]}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="scale-ends">
-                <span>1 = {scaleLabels[1]}</span>
-                <span>5 = {scaleLabels[5]}</span>
-              </div>
-            </div>
-          ))}
-
-          <button
-            className="btn btn-primary"
-            style={{ width: '100%' }}
-            type="submit"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Saving…' : `Submit ${title}`}
-          </button>
-          {submitError && <div className="assessment-submit-error" role="alert">{submitError}</div>}
-          {submitSuccess && <div className="assessment-submit-success" role="status">{submitSuccess}</div>}
-        </div>
-      </form>
     </>
   );
 };
