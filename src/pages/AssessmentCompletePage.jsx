@@ -5,21 +5,29 @@ import { dimFullNames, dimLabels } from './assessmentQuestions.js';
 import { MAX_CATEGORY_SCORE, getPosition, getFrictionVector, getGrowthEdge, getRawTotal, getScoringBand, getScoringBandByKey } from './scoringBands.js';
 import './AssessmentCompletePage.css';
 
-const strengthInsights = [
-  'This is where your energy is clearest right now. Notice it — not to feel good about it, but because your next step should start here. Strength without direction is still motion without momentum.',
-  'You know what matters. That is rarer than it sounds. Use it as your filter for every decision in the next 90 days.',
-  'You can see the patterns that have been running the show. That self-awareness is your edge. The next step is deciding what to do with what you see.',
-  'Your direction is clear. The work now is building the belief that the destination is actually yours to claim.',
-  'You trust yourself. That is the foundation everything else is built on. Protect it.'
+const narrativeTier = (score) => (score < 8 ? 'Emerging' : score < 12 ? 'Developing' : score < 16 ? 'Strong' : 'Exceptional');
+
+const dimensionNarratives = [
+  ['Naming your own strengths plainly is harder than it should be right now. The work is to notice your real capability and build the language and confidence to claim it.', 'You can point to a few strengths, but the picture is still partial. The next step is to name and use the strengths you already sense more consistently.', "You have a mostly accurate picture of what you are good at and are using it. The edge is full-time deployment: bringing your sharpest strengths into more of your work.", "You know what you are good at, say so without hedging, and use it consistently. Your edge is stewardship: keep choosing work that actually uses it."],
+  ["What matters most to you has not been clearly named yet, which makes it hard to notice when daily choices contradict it. Start by separating what is yours from other people's priorities.", "You have a rough sense of what matters, but it is not yet specific enough to guide decisions. Naming that specificity is the next unlock.", 'You can name what matters with real clarity, and most choices reflect it. Watch for moments of pressure or transition, when expedience can displace a values match.', 'Your values are clear, named, and consistently reflected in how you spend your time. The edge is holding that clarity steady through the next big change.'],
+  ["A learned pattern may be shaping what you do or avoid without much conscious input. This is not a skills gap; naming the pattern precisely is most of the work.", 'You can sense something getting in your way, but the trigger, protection, and cost are not fully mapped. A precise map turns insight into behavior change.', "You have identified a main pattern and are interrupting it more often than not. Expect it to resurface in a new disguise, especially under stress.", 'You have working clarity on your patterns, triggers, and early warning signs. The edge is sustaining this choice-led way of operating.'],
+  ["Where you are headed is still foggy, so every opportunity has to be judged in isolation. This is what direction feels like before it has had a chance to form.", 'You have a general sense of direction, enough to rule some things out. The next stage is precision about the options already in front of you.', "Your direction is clear and you recognize real opportunity. The edge is sequencing: knowing what is next, not just what is possible.", 'Your direction actively shapes which opportunities you pursue and which you let pass. Protect it from well-meaning noise as your options expand.'],
+  ["There is a gap between what you know about yourself and what you can act on with confidence. The issue is not capability; it is trust in capability already present.", 'You are becoming more consistent, but confidence changes with the context or audience. That variation is useful data about where doubt is concentrated.', "You are operating from mostly steady confidence, and your actions increasingly match what you believe. Expect a new arena to test whether that confidence transfers.", 'What you believe, say, and do are closely matched across most contexts. Stay open enough to update that hard-won confidence when the situation calls for it.'],
 ];
 
-const growthInsights = [
-  'This dimension is quietly limiting everything else. Most people sense it but do not name it. You just named it. What you do with that information in the next 48 hours determines whether this assessment changes anything.',
-  'When values are unclear, every decision costs twice as much energy. This is where the work starts.',
-  'The pattern is still running in the background. Naming it is step one. Breaking it requires a different kind of support.',
-  'You have capability without a clear direction to aim it at. That is an expensive gap. The Clarity Intensive closes it.',
-  'Action without self-trust burns out fast. This is the foundational work.'
-];
+const positionNarratives = {
+  'System Evaluator': "Direction and values are still forming, and outward action and confidence have not fully engaged yet. This is not a low point; it is often the most honest place to begin. The work is not to force momentum before it is earned, but to get sharper about what you actually want so future action is pointed at the right target.",
+  'Strategic Planner': "You know where you are headed and why it matters. What has not caught up is strengths deployment and lived confidence that turn a clear plan into visible motion. The thinking work is largely done; what remains is permission and follow-through, not another round of refinement.",
+  'Kinetic Operator': "Your strengths are active and your confidence reads as real in how you operate. What is still forming is the settled sense of what matters most and where this momentum is headed. Keep moving, but periodically look up from the doing and confirm the direction is still the one you would choose.",
+  'Momentum Builder': "You are clear on what matters and where you are headed, and actively building toward it. The real risk is not stalling but coasting — assuming the clarity and momentum you have built will sustain themselves without deliberate maintenance.",
+};
+
+const frictionNarratives = {
+  'Self-Discounter': "The friction traces back to values that have not been fully claimed as yours. The drag is not a discipline problem; it is the permission to name what you actually want, separate from what is expected of you.",
+  'Vision Staller': "You have a reasonable sense of what matters, but translating it into a specific direction has stalled. The values have not yet been converted into a concrete destination you can move toward.",
+  'Imposter Protector': "There is hesitation around fully owning and deploying what you are genuinely good at. The drag is not a skills gap; it is a permission gap that keeps real capability underused.",
+  'The Magnifier': "You likely know what you are capable of, but overanalyzing, over-preparing, or second-guessing slows down how confidently you act on it. Scrutiny is running louder than the confidence you have earned.",
+};
 
 const AssessmentCompletePage = () => {
   const location = useLocation();
@@ -37,6 +45,8 @@ const AssessmentCompletePage = () => {
   const avgPct = Math.round((avgScore / MAX_CATEGORY_SCORE) * 100);
   const maxIdx = categoryScores.indexOf(Math.max(...categoryScores));
   const growthEdgeIndex = growthEdge?.index ?? 0;
+  const strongestTier = narrativeTier(categoryScores[maxIdx]);
+  const growthTier = narrativeTier(categoryScores[growthEdgeIndex]);
 
   // 1. Count Up Score Animation
   const [animatedScore, setAnimatedScore] = useState(0);
@@ -281,8 +291,9 @@ const AssessmentCompletePage = () => {
         <div className="r2-dimensions">
           {categoryScores.map((catScore, index) => {
             const pct = Math.round((catScore / MAX_CATEGORY_SCORE) * 100);
-            const statusLabel = pct >= 72 ? 'Active' : pct >= 52 ? 'Developing' : 'Emerging';
-            const statusClass = pct >= 72 ? 'status-active' : pct >= 52 ? 'status-developing' : 'status-emerging';
+            const statusLabel = narrativeTier(catScore);
+            const statusClass = `tier-${statusLabel.toLowerCase()}`;
+            const narrativeIndex = ['Emerging', 'Developing', 'Strong', 'Exceptional'].indexOf(statusLabel);
             return (
               <div className="r2-dim-row" key={dimLabels[index]}>
                 <div className="r2-dim-label-wrap">
@@ -294,6 +305,7 @@ const AssessmentCompletePage = () => {
                     <div className="r2-avg-line" style={{ left: `${avgPct}%` }}></div>
                   </div>
                   <span className={`r2-dim-status ${statusClass}`}>{statusLabel}</span>
+                  <p className="r2-dim-narrative">{dimensionNarratives[index][narrativeIndex]}</p>
                 </div>
                 <div className="r2-dim-score-num">{Number.isInteger(catScore) ? catScore : catScore.toFixed(1)}</div>
               </div>
@@ -306,14 +318,14 @@ const AssessmentCompletePage = () => {
         <div className="r2-split-header">YOUR STRENGTHS &amp; GROWTH EDGE</div>
         <div className="r2-split-grid">
           <div className="r2-split-card r2-strength-card hover-lift">
-            <div className="r2-split-card-label">YOUR STRONGEST DIMENSION</div>
+            <div className="r2-split-card-label">YOUR STRONGEST DIMENSION · {strongestTier}</div>
             <div className="r2-split-card-name">{dimFullNames[maxIdx]}</div>
-            <div className="r2-split-card-body">{strengthInsights[maxIdx]}</div>
+            <div className="r2-split-card-body">{dimensionNarratives[maxIdx][['Emerging', 'Developing', 'Strong', 'Exceptional'].indexOf(strongestTier)]}</div>
           </div>
           <div className="r2-split-card r2-growth-card hover-lift">
-            <div className="r2-split-card-label">YOUR PRIMARY GROWTH EDGE</div>
+            <div className="r2-split-card-label">YOUR PRIMARY GROWTH EDGE · {growthTier}</div>
             <div className="r2-split-card-name">{dimFullNames[growthEdgeIndex]}</div>
-            <div className="r2-split-card-body">{growthInsights[growthEdgeIndex]}</div>
+            <div className="r2-split-card-body">{dimensionNarratives[growthEdgeIndex][['Emerging', 'Developing', 'Strong', 'Exceptional'].indexOf(growthTier)]}</div>
           </div>
         </div>
       </div>
@@ -322,15 +334,15 @@ const AssessmentCompletePage = () => {
         <div className="r2-section">
           <div className="r2-section-header">
             <div className="r2-section-title">YOUR POSITION</div>
-            <div className="r2-section-sub">Inner axis: Strengths & Skills + Alignment & Confidence · Outer axis: Values & What Matters + Direction & Opportunity</div>
+            <div className="r2-section-sub">Inner Clarity: Values & What Matters + Direction & Opportunity · Outer Action: Strengths & Skills + Alignment & Confidence</div>
           </div>
           <div className="r2-position-card">
             <div className="r2-position-quadrant">{position.quadrant}</div>
             <div className="r2-position-detail">
-              <span>Inner Axis: {position.innerAxis.toFixed(1)} / 40</span>
-              <span>Outer Axis: {position.outerAxis.toFixed(1)} / 40</span>
-              <span>Threshold: {position.threshold}</span>
+              <span>Inner Clarity: {position.innerAxis.toFixed(1)} / 40</span>
+              <span>Outer Action: {position.outerAxis.toFixed(1)} / 40</span>
             </div>
+            <p className="r2-signal-narrative">{positionNarratives[position.quadrant]}</p>
           </div>
         </div>
       )}
@@ -339,14 +351,15 @@ const AssessmentCompletePage = () => {
         <div className="r2-section">
           <div className="r2-section-header">
             <div className="r2-section-title">YOUR FRICTION VECTOR</div>
-            <div className="r2-section-sub">Drawn from Patterns & Blocks + your lower Position axis</div>
+            <div className="r2-section-sub">Your lower axis and the dimension within it that needs the most support</div>
           </div>
           <div className="r2-friction-card">
             <div className="r2-friction-archetype">{frictionVector.archetype}</div>
             <div className="r2-friction-detail">
-              <span>Patterns & Blocks Score: {frictionVector.patternsBlocks} / 20</span>
-              <span>Lower Axis: {frictionVector.lowerAxis === 'inner' ? 'Inner (Strengths & Skills + Alignment & Confidence)' : 'Outer (Values & What Matters + Direction & Opportunity)'}</span>
+              <span>Lagging axis: {frictionVector.lowerAxis === 'inner' ? 'Inner Clarity' : 'Outer Action'}</span>
+              <span>Focus dimension: {frictionVector.weakerDimension}</span>
             </div>
+            <p className="r2-signal-narrative">{frictionNarratives[frictionVector.archetype]}</p>
           </div>
         </div>
       )}
@@ -359,7 +372,8 @@ const AssessmentCompletePage = () => {
           </div>
           <div className="r2-growth-edge-card">
             <div className="r2-growth-edge-name">{dimFullNames[growthEdge.index]}</div>
-            <div className="r2-growth-edge-score">{growthEdge.score} / 20</div>
+            <div className="r2-growth-edge-score">{growthEdge.score} / 20 · {growthTier}</div>
+            <p className="r2-signal-narrative">{dimensionNarratives[growthEdge.index][['Emerging', 'Developing', 'Strong', 'Exceptional'].indexOf(growthTier)]}</p>
           </div>
         </div>
       )}

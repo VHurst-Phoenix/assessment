@@ -8,8 +8,11 @@ export const POSITION_MAX_AXIS_SCORE = 40;
 export function getPosition(categoryScores) {
   if (!Array.isArray(categoryScores) || categoryScores.length < 5) return null;
 
-  const innerAxis = Number(categoryScores[0]) + Number(categoryScores[4]);
-  const outerAxis = Number(categoryScores[1]) + Number(categoryScores[3]);
+  // Inner Clarity: Values & What Matters + Direction & Opportunity.
+  // Outer Action: Strengths & Skills + Alignment & Confidence.
+  // Patterns & Blocks is intentionally excluded from both axes.
+  const innerAxis = Number(categoryScores[1]) + Number(categoryScores[3]);
+  const outerAxis = Number(categoryScores[0]) + Number(categoryScores[4]);
   if (!Number.isFinite(innerAxis) || !Number.isFinite(outerAxis)) return null;
 
   const innerHigh = innerAxis >= POSITION_THRESHOLD;

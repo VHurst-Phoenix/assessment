@@ -15,8 +15,8 @@ test('uses the locked normalized Position threshold and quadrant names', () => {
 test('feeds the lower Position axis into Friction Vector', () => {
   const position = getPosition([16, 10, 12, 11, 16]);
   const vector = getFrictionVector([16, 10, 12, 11, 16], position);
-  assert.equal(position.quadrant, 'Strategic Planner');
-  assert.equal(vector.lowerAxis, 'outer');
-  assert.equal(vector.patternsBlocks, 12);
+  assert.equal(position.quadrant, 'Kinetic Operator');
+  assert.equal(vector.lowerAxis, 'inner');
+  assert.equal(vector.weakerDimension, 'Values & What Matters');
   assert.equal(vector.archetype, 'Self-Discounter');
 });
