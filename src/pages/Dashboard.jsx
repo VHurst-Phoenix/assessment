@@ -147,17 +147,6 @@ const Dashboard = () => {
   const scoredRecords = filteredData.filter((item) => item.score !== undefined && item.score !== null);
   const averageScore = scoredRecords.length ? Math.round(scoredRecords.reduce((sum, item) => sum + (Number(item.score) || 0), 0) / scoredRecords.length) : 0;
   const pendingTestimonials = filteredData.filter((item) => item.status === 'Pending Review').length;
-  const analytics = (() => {
-    if (activeTab === 'testimonials') {
-      const reviewed = filteredData.filter((item) => item.status === 'Approved' || item.status === 'Rejected');
-      const approved = reviewed.filter((item) => item.status === 'Approved').length;
-      return { value: reviewed.length ? `${Math.round((approved / reviewed.length) * 100)}%` : '—', detail: reviewed.length ? 'Approval rate for reviewed stories' : 'No reviewed stories yet' };
-    }
-    const labels = filteredData.map((item) => item.archetypeName || item.archetype || item.band).filter(Boolean);
-    const counts = labels.reduce((summary, label) => ({ ...summary, [label]: (summary[label] || 0) + 1 }), {});
-    const [topBand, count = 0] = Object.entries(counts).sort(([, first], [, second]) => second - first)[0] || [];
-    return { value: topBand || '—', detail: count ? `${count} of ${totalRecords} visible records` : 'No band data available' };
-  })();
   const bandDistribution = (() => {
     const labels = filteredData.map((item) => item.archetypeName || item.archetype || item.band).filter(Boolean);
     const counts = labels.reduce((summary, label) => ({ ...summary, [label]: (summary[label] || 0) + 1 }), {});
@@ -233,7 +222,6 @@ const Dashboard = () => {
           <article className="overview-card overview-card-primary"><span className="overview-label">Total records</span><strong>{totalRecords}</strong><small>{search || selectedSegment || selectedStatus ? 'Matching current filters' : 'Across this collection'}</small></article>
           <article className="overview-card"><span className="overview-label">{activeTab === 'testimonials' ? 'Pending review' : 'Average score'}</span><strong>{activeTab === 'testimonials' ? pendingTestimonials : activeTab === 'clarity' ? String(averageScore) : String(averageScore) + '%'}</strong><small>{activeTab === 'testimonials' ? 'Stories awaiting a decision' : activeTab === 'clarity' ? 'Out of 100 points' : 'Across scored records'}</small></article>
           {activeTab !== 'testimonials' && <article className="overview-card dashboard-band-distribution"><span className="overview-label">Band distribution</span><div className="band-distribution-bars">{bandDistribution.entries.map((entry, index) => <div className="band-distribution-column" key={entry.label}><i className={'band-distribution-fill band-step-' + (index + 1)} style={{ height: Math.max(8, (entry.count / bandDistribution.max) * 44) }} /><b>{entry.count}</b><small>{entry.label}</small></div>)}</div></article>}
-          <article className="overview-card overview-card-analytics"><span className="overview-label">Analytics</span><strong>{analytics.value}</strong><small>{analytics.detail}</small></article>
           <article className="overview-card overview-card-latest"><span className="overview-label">Latest received</span><strong>{latestRecord ? formatDate(latestRecord.date, { month: 'short', day: 'numeric' }) : '—'}</strong><small>{latestRecord ? getName(latestRecord) : 'No submissions yet'}</small></article>
         </section>
 
