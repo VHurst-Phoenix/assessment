@@ -21,6 +21,12 @@ import './Dashboard.css';
 
 const PAGE_SIZE = 8;
 
+const bandOrder = {
+  clarity: ['Transitioner', 'Strategist', 'Executor', 'Phoenix'],
+  readiness: ['Guarded', 'Developing', 'Willing', 'All In'],
+  execution: ['Friction-Bound', 'Emergent Traction', 'Operational Cadence', 'Strategic Velocity'],
+};
+
 const tabConfig = {
   clarity: { label: 'Clarity', collection: 'Assessment records' },
   readiness: { label: 'Readiness', collection: 'Readiness records' },
@@ -141,7 +147,24 @@ const Dashboard = () => {
   const scoredRecords = filteredData.filter((item) => item.score !== undefined && item.score !== null);
   const averageScore = scoredRecords.length ? Math.round(scoredRecords.reduce((sum, item) => sum + (Number(item.score) || 0), 0) / scoredRecords.length) : 0;
   const pendingTestimonials = filteredData.filter((item) => item.status === 'Pending Review').length;
-  const attentionCount = activeTab === 'testimonials' ? pendingTestimonials : filteredData.filter((item) => Number(item.score) < 50).length;
+  const analytics = (() => {
+    if (activeTab === 'testimonials') {
+      const reviewed = filteredData.filter((item) => item.status === 'Approved' || item.status === 'Rejected');
+      const approved = reviewed.filter((item) => item.status === 'Approved').length;
+      return { value: reviewed.length ? `${Math.round((approved / reviewed.length) * 100)}%` : '—', detail: reviewed.length ? 'Approval rate for reviewed stories' : 'No reviewed stories yet' };
+    }
+    const labels = filteredData.map((item) => item.archetypeName || item.archetype || item.band).filter(Boolean);
+    const counts = labels.reduce((summary, label) => ({ ...summary, [label]: (summary[label] || 0) + 1 }), {});
+    const [topBand, count = 0] = Object.entries(counts).sort(([, first], [, second]) => second - first)[0] || [];
+    return { value: topBand || '—', detail: count ? `${count} of ${totalRecords} visible records` : 'No band data available' };
+  })();
+  const bandDistribution = (() => {
+    const labels = filteredData.map((item) => item.archetypeName || item.archetype || item.band).filter(Boolean);
+    const counts = labels.reduce((summary, label) => ({ ...summary, [label]: (summary[label] || 0) + 1 }), {});
+    const ordered = bandOrder[activeTab] || Object.keys(counts);
+    const entries = ordered.map((label) => ({ label, count: counts[label] || 0 }));
+    return { entries, max: Math.max(...entries.map((entry) => entry.count), 1) };
+  })();
   const latestRecord = filteredData.slice().sort((a, b) => new Date(b.date) - new Date(a.date))[0];
   const segmentSummary = ['Individual', 'Corporate', 'Federal'].map((segment) => ({ segment, count: filteredData.filter((item) => item.segment === segment).length }));
   const maxSegmentCount = Math.max(...segmentSummary.map(({ count }) => count), 1);
@@ -202,14 +225,15 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-page animate-fade-slide">
-      <section className="dashboard-hero"><div className="dashboard-hero-inner"><div><div className="dashboard-kicker">Phoenix Coach Console</div><h1>Client <em>dashboard</em></h1><p>Review client signals, manage submissions, and move from overview to the details that need your attention.</p></div><div className="dashboard-hero-actions"><button type="button" onClick={exportFilteredRows} className="btn btn-gold" disabled={isExporting || isLoading}>{isExporting ? 'Exporting…' : 'Export current view'}</button><button type="button" onClick={handleLogout} className="dashboard-logout">Log out</button></div></div></section>
+      <section className="dashboard-hero"><div className="dashboard-hero-inner"><div><div className="dashboard-kicker">Phoenix Coach Console</div><h1>Client <em>dashboard</em></h1><p>Review client signals, manage submissions, and move from overview to meaningful client detail.</p></div><div className="dashboard-hero-actions"><button type="button" onClick={exportFilteredRows} className="btn btn-gold" disabled={isExporting || isLoading}>{isExporting ? 'Exporting…' : 'Export current view'}</button><button type="button" onClick={handleLogout} className="dashboard-logout">Log out</button></div></div></section>
       <nav className="dashboard-tabs" aria-label="Dashboard data type"><div className="dashboard-tabs-inner" role="tablist">{tabs.map((tab) => <button type="button" key={tab.key} role="tab" aria-selected={activeTab === tab.key} className={`dashboard-tab ${activeTab === tab.key ? 'is-active' : ''}`} onClick={() => switchTab(tab.key)}>{tab.label}{tab.count !== null && <span>{tab.count}</span>}</button>)}</div></nav>
 
       <main className="dashboard-shell">
-        <section className="dashboard-overview" aria-label={`${tabConfig[activeTab].label} overview`}>
-          <article className="overview-card overview-card-primary"><span className="overview-label">Visible records</span><strong>{totalRecords}</strong><small>{search || selectedSegment || selectedStatus ? 'Matching current filters' : 'Across this collection'}</small></article>
-          <article className="overview-card"><span className="overview-label">{activeTab === 'testimonials' ? 'Pending review' : 'Average score'}</span><strong>{activeTab === 'testimonials' ? pendingTestimonials : activeTab === 'clarity' ? `${averageScore}` : `${averageScore}%`}</strong><small>{activeTab === 'testimonials' ? 'Stories awaiting a decision' : activeTab === 'clarity' ? 'Out of 100 points' : 'Across scored records'}</small></article>
-          <article className="overview-card overview-card-attention"><span className="overview-label">Needs attention</span><strong>{attentionCount}</strong><small>{activeTab === 'testimonials' ? 'Pending story submissions' : 'Scores below 50%'}</small></article>
+        <section className="dashboard-overview dashboard-cohort-bar" aria-label={tabConfig[activeTab].label + ' cohort intelligence'}>
+          <article className="overview-card overview-card-primary"><span className="overview-label">Total records</span><strong>{totalRecords}</strong><small>{search || selectedSegment || selectedStatus ? 'Matching current filters' : 'Across this collection'}</small></article>
+          <article className="overview-card"><span className="overview-label">{activeTab === 'testimonials' ? 'Pending review' : 'Average score'}</span><strong>{activeTab === 'testimonials' ? pendingTestimonials : activeTab === 'clarity' ? String(averageScore) : String(averageScore) + '%'}</strong><small>{activeTab === 'testimonials' ? 'Stories awaiting a decision' : activeTab === 'clarity' ? 'Out of 100 points' : 'Across scored records'}</small></article>
+          {activeTab !== 'testimonials' && <article className="overview-card dashboard-band-distribution"><span className="overview-label">Band distribution</span><div className="band-distribution-bars">{bandDistribution.entries.map((entry, index) => <div className="band-distribution-column" key={entry.label}><i className={'band-distribution-fill band-step-' + (index + 1)} style={{ height: Math.max(8, (entry.count / bandDistribution.max) * 44) }} /><b>{entry.count}</b><small>{entry.label}</small></div>)}</div></article>}
+          <article className="overview-card overview-card-analytics"><span className="overview-label">Analytics</span><strong>{analytics.value}</strong><small>{analytics.detail}</small></article>
           <article className="overview-card overview-card-latest"><span className="overview-label">Latest received</span><strong>{latestRecord ? formatDate(latestRecord.date, { month: 'short', day: 'numeric' }) : '—'}</strong><small>{latestRecord ? getName(latestRecord) : 'No submissions yet'}</small></article>
         </section>
 
