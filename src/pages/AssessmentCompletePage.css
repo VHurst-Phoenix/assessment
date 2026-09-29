@@ -771,3 +771,19 @@
     max-height: 90vh;
   }
 }
+
+
+/* Narrative report rebuild */
+.r2-dim-row { align-items: start; }
+.r2-dim-bar-wrap { min-width: 0; }
+.r2-dim-narrative, .r2-signal-narrative { margin: 10px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.65; }
+.r2-signal-narrative { max-width: 680px; color: var(--charcoal); font-size: .92rem; }
+.tier-emerging { background: #FAECEE; color: #8B2635; }
+.tier-developing { background: #FBF8E8; color: #927200; }
+.tier-strong { background: #EAF4EF; color: #2D6A4F; }
+.tier-exceptional { background: #E9EEF9; color: #263B82; }
+.r2-position-card, .r2-friction-card, .r2-growth-edge-card { padding: 22px; border: 1px solid var(--ivory-dark); border-radius: 12px; background: var(--ivory); }
+.r2-position-quadrant, .r2-friction-archetype, .r2-growth-edge-name { font-family: 'Playfair Display', serif; font-size: 1.45rem; color: var(--navy); font-weight: 700; }
+.r2-position-detail, .r2-friction-detail { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 8px; color: var(--muted); font-size: .78rem; font-weight: 700; }
+.r2-growth-edge-score { color: var(--gold); font-weight: 800; margin-top: 4px; }
+@media (max-width: 600px) { .r2-dim-row { grid-template-columns: 1fr 44px; } .r2-dim-bar-wrap { grid-column: 1 / -1; grid-row: 2; } .r2-dim-score-num { grid-column: 2; grid-row: 1; } }

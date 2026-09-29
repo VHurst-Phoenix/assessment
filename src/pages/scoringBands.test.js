@@ -4,13 +4,13 @@ import { GROWTH_EDGE_TIE_BREAK_ORDER, getAdjustedResponse, getCategoryScores, ge
 
 test('converts reverse-adjusted 25–125 marks to the required 20–100 score', () => {
   const lowestAnswers = Array(25).fill(1);
-  [2, 7, 11, 17, 20].forEach((index) => { lowestAnswers[index] = 5; });
+  [1, 6, 12, 16, 23].forEach((index) => { lowestAnswers[index] = 5; });
   assert.equal(getRawTotal(lowestAnswers), 25);
   assert.equal(getClarityScore(lowestAnswers), 20);
   assert.equal(getRawTotal(Array(25).fill(3)), 75);
   assert.equal(getClarityScore(Array(25).fill(3)), 60);
   const highestAnswers = Array(25).fill(5);
-  [2, 7, 11, 17, 20].forEach((index) => { highestAnswers[index] = 1; });
+  [1, 6, 12, 16, 23].forEach((index) => { highestAnswers[index] = 1; });
   assert.equal(getRawTotal(highestAnswers), 125);
   assert.equal(getClarityScore(highestAnswers), 100);
 });
@@ -22,10 +22,10 @@ test('returns zero for missing or empty responses', () => {
 
 test('keeps raw responses intact while reverse-scoring the five flagged items', () => {
   const answers = Array(25).fill(5);
-  // Q3 is reverse-scored: a raw 1 becomes an adjusted 5.
-  answers[2] = 1;
+  // Q2 is reverse-scored: a raw 1 becomes an adjusted 5.
+  answers[1] = 1;
 
-  assert.equal(getAdjustedResponse(answers[2], { reverse: true }), 5);
+  assert.equal(getAdjustedResponse(answers[1], { reverse: true }), 5);
   assert.deepEqual(getCategoryScores(answers), [20, 16.8, 16.8, 16.8, 16.8]);
   assert.equal(getRawTotal(answers), 109);
   assert.equal(getClarityScore(answers), 87.2);
