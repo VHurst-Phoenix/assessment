@@ -241,7 +241,7 @@ function buildEmailText(data) {
     'MY DIRECT READ OF YOUR SCORES',
     band?.directRead || 'Your results are ready for review with your coach.',
     '',
-    'Book your Clarity Session: https://www.phoenixclearinsight.com/book',
+    'Book your Clarity Session: https://phoneixclearinsight.as.me/schedule/e8a7e423/appointment/92792406/calendar/14034515',
   ].filter(Boolean).join('\n');
 }
 
