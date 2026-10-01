@@ -175,6 +175,9 @@ function buildEmailHTML(data) {
                     <a href="https://www.phoenixclearinsight.com/book" style="display:inline-block;background-color:#D4A056;color:#0D1028;font-weight:800;padding:14px 28px;border-radius:6px;text-decoration:none;font-size:14px;letter-spacing:0.02em;box-shadow:0 4px 10px rgba(212,160,86,0.3);">
                       Book Your Clarity Session ($497) →
                     </a>
+                    <p style="margin:18px 0 0;font-size:13px;line-height:1.5;">
+                      <a href="https://www.phoenixclearinsight.com/program" style="color:#D4A056;font-weight:700;text-decoration:underline;">Learn more about the Phoenix Clear Insight program →</a>
+                    </p>
                     <p style="color:rgba(255,255,255,0.35);font-size:12px;font-style:italic;margin:16px 0 0 0;">Scholarship pricing available. Ask about it during your discovery call.</p>
                   </td>
                 </tr>
@@ -242,6 +245,7 @@ function buildEmailText(data) {
     band?.directRead || 'Your results are ready for review with your coach.',
     '',
     'Book your Clarity Session: https://phoneixclearinsight.as.me/schedule/e8a7e423/appointment/92792406/calendar/14034515',
+    'Learn more about the Phoenix Clear Insight program: https://www.phoenixclearinsight.com/program',
   ].filter(Boolean).join('\n');
 }
 
