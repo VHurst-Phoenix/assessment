@@ -294,9 +294,7 @@ export async function createAssessment(payload, { signal } = {}) {
   const insertAssessment = (row) => {
     let query = supabase
       .from(env.supabaseAssessmentsTable)
-      .insert(row)
-      .select('*')
-      .single();
+      .insert(row);
 
     if (signal) {
       query = query.abortSignal(signal);
@@ -395,9 +393,7 @@ export async function createTestimonial(payload) {
 
   const insertTestimonial = (row) => supabase
     .from(env.supabaseTestimonialsTable)
-    .insert(row)
-    .select('*')
-    .single();
+    .insert(row);
 
   try {
     const omittedColumns = new Set();
@@ -483,9 +479,7 @@ export async function createReadiness(payload) {
     const { data, error } = await withTimeout(
       supabase
         .from(tableName)
-        .insert(row)
-        .select('*')
-        .single(),
+        .insert(row),
       30000
     );
 
@@ -528,9 +522,7 @@ export async function createExecutionForm(payload) {
     const { data, error } = await withTimeout(
       supabase
         .from(tableName)
-        .insert(row)
-        .select('*')
-        .single(),
+        .insert(row),
       30000
     );
 
