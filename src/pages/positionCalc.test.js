@@ -20,3 +20,21 @@ test('feeds the lower Position axis into Friction Vector', () => {
   assert.equal(vector.weakerDimension, 'Values & What Matters');
   assert.equal(vector.archetype, 'Self-Discounter');
 });
+
+test('treats an exact axis tie as Outer lagging', () => {
+  // Inner = 16 + 12 = 28, Outer = 14.4 + 13.6 = 28.
+  const scores = [14.4, 16, 10, 12, 13.6];
+  const position = getPosition(scores);
+  const vector = getFrictionVector(scores, position);
+  assert.equal(position.innerAxis, position.outerAxis);
+  assert.equal(vector.lowerAxis, 'outer');
+  assert.equal(vector.weakerDimension, 'Alignment & Confidence');
+  assert.equal(vector.archetype, 'The Magnifier');
+});
+
+test('breaks a tie inside the lagging axis toward the first-listed dimension', () => {
+  const scores = [12, 16, 10, 16, 12];
+  const vector = getFrictionVector(scores, getPosition(scores));
+  assert.equal(vector.lowerAxis, 'outer');
+  assert.equal(vector.archetype, 'Imposter Protector');
+});

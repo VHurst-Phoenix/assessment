@@ -488,7 +488,7 @@
   font-size: 0.85rem;
   line-height: 1.6;
   color: var(--muted);
-  max-height: 160px;
+  max-height: 280px;
   overflow-y: auto;
   margin-bottom: 16px;
 }

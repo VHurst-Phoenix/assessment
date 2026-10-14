@@ -13,5 +13,9 @@ export {
   deleteTestimonial,
   deleteAssessment,
   deleteReadiness,
-  deleteExecutionForm
+  deleteExecutionForm,
+  countAllRecords,
+  storeClarityReport,
+  getClarityReportUrl,
+  releaseClarityReport
 } from './supabaseRestClient';

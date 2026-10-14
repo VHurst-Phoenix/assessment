@@ -5,15 +5,17 @@ function flattenValue(value) {
   return String(value);
 }
 
-function escapeCsvValue(value) {
-  const stringValue = flattenValue(value);
+export function escapeCsvValue(value) {
+  let stringValue = flattenValue(value);
+
+  // Neutralize spreadsheet formulas before quoting, so a value such as
+  // =HYPERLINK("…","x") cannot slip through inside a quoted cell.
+  if (/^[=+\-@\t\r]/.test(stringValue)) {
+    stringValue = `'${stringValue}`;
+  }
 
   if (/[",\n\r]/.test(stringValue)) {
     return `"${stringValue.replace(/"/g, '""')}"`;
-  }
-
-  if (/^[=+\-@]/.test(stringValue)) {
-    return `'${stringValue}`;
   }
 
   return stringValue;

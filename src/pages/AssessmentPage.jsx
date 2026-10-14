@@ -9,7 +9,7 @@ import {
 } from './assessmentQuestions';
 import { getCategoryScores, getClarityScore, getRawTotal, getScoringBand } from './scoringBands';
 import { getAssessmentPath, getAssessmentTab } from './assessmentRoutes';
-import { hasConsented, hasToolConsented, CLARITY_CONSENT_VERSION } from '../lib/consent';
+import { hasToolConsented, CLARITY_CONSENT_VERSION, CONSENT_CONTACT_EMAIL } from '../lib/consent';
 import './AssessmentPage.css';
 
 const TOOL_ASSESSMENT_PASSCODE = 'Accomplished26!';
@@ -25,11 +25,8 @@ const AssessmentPage = () => {
   const [passcode, setPasscode] = useState('');
   const [passcodeError, setPasscodeError] = useState('');
 
-  // Only the public Clarity assessment uses the digital consent screen.
-  if (activeTab === 'clarity' && !hasConsented()) {
-    const next = encodeURIComponent(location.pathname + location.search);
-    return <Navigate to={`/consent?next=${next}`} replace />;
-  }
+  // Clarity consent is the Participation & Data Use Notice inside the intake
+  // step, acknowledged (and timestamped) immediately before Question 1.
 
   const currentAssessmentType = activeTab === 'execution' ? 'execution' : 'readiness';
 
@@ -262,7 +259,7 @@ const ClarityAssessment = ({ navigate }) => {
     setSubmitError('');
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     const score = calculateScore();
     const rawScore = getRawTotal(answers);
@@ -429,18 +426,33 @@ const ClarityAssessment = ({ navigate }) => {
               />
             </div>
 
-            {/* ── Participation & Data Use Notice ── */}
+            {/* ── Participation & Data Use Notice (Master Fix List, Appendix A) ── */}
             <div className="consent-notice-block">
-              <div className="consent-notice-heading">Participation &amp; Data Use Notice</div>
+              <div className="consent-notice-heading">Phoenix Clarity Assessment — Participation &amp; Data Use Notice</div>
               <div className="consent-notice-body">
+                <p>
+                  Thank you for taking the Phoenix Clarity Assessment. Before you begin, please review the following.
+                </p>
+                <p>
+                  <strong>Purpose:</strong> This assessment is a coaching and reflection tool designed to help you understand your current sense of clarity, direction, and momentum. It is not a clinical, diagnostic, or employment-related instrument, and your individual results will not be shared with your employer or program sponsor, or used in any employment, promotion, or performance decision, unless you explicitly choose to share them yourself.
+                </p>
+                <p>
+                  <strong>Development status:</strong> The Phoenix Clarity Assessment is a proprietary tool currently in active development. It has not yet completed formal psychometric validation. Please treat your results as a reflective coaching tool, not a certified or clinically validated measurement.
+                </p>
                 <p>
                   <strong>What we collect:</strong> your name, your email address, your organization or agency affiliation (if applicable), your Segment (Individual, Corporate, or Federal), how you identify (if you choose to share it), how you heard about Phoenix Clear Insight, your responses to the 25 assessment questions, anything you choose to share in the optional "what brings you here today" field, and any follow-up survey responses you choose to provide.
                 </p>
                 <p>
-                  <strong>How it's used:</strong> Your responses generate your Clarity Score, Band, Position, Friction Vector, and Growth Edge — sent to you by email and used, with your permission, to inform coaching conversations should you choose to work with us.
+                  <strong>How we use it:</strong> Your individual results are used to generate your personal report and inform your coaching conversations. With your permission, anonymized and aggregated response data — with all identifying information removed — may also be used to improve the assessment and, over time, to support formal research validation of the instrument. Your individual, identifiable responses will never be shared with a third party without your explicit written consent.
                 </p>
                 <p>
-                  <strong>Where it's stored:</strong> Stored securely, accessible only to Phoenix Clear Insight Consulting LLC.
+                  <strong>Where it's stored:</strong> Your responses are stored securely and are accessible only to Phoenix Clear Insight Consulting LLC for the purposes described above.
+                </p>
+                <p>
+                  <strong>Your rights:</strong> Participation is voluntary. You may decline to answer any question, and you may request that your data be deleted at any time by contacting <a href={`mailto:${CONSENT_CONTACT_EMAIL}`}>{CONSENT_CONTACT_EMAIL}</a>.
+                </p>
+                <p>
+                  By continuing, you acknowledge that you have read and understood this notice.
                 </p>
               </div>
               <label className="consent-inline-checkbox" htmlFor="consent-intake">

@@ -33,8 +33,8 @@ const calculateAssessment = ({ answers, categoryNames, bands, gapArchetypes }) =
   };
 };
 
-const executionCategories = ['Consistency', 'Alignment & Authenticity', 'Resilience'];
-const readinessCategories = ['Self-Awareness & Capability', 'Emotional Stability & Capacity', 'Commitment & Investment'];
+export const executionCategories = ['Consistency', 'Alignment & Authenticity', 'Resilience'];
+export const readinessCategories = ['Self-Awareness & Capability', 'Emotional Stability & Capacity', 'Commitment & Investment'];
 
 export const getExecutionResults = (answers) => calculateAssessment({
   answers,

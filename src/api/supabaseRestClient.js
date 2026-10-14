@@ -89,6 +89,9 @@ export function mapAssessment(row) {
     archetypeName: correctedBand?.label || archetypeNames[row.archetype] || row.archetype || '',
     categoryScores: hasCompleteResponses ? getCategoryScores(answers) : null,
     dimScores: Array.isArray(row.dim_scores) ? row.dim_scores : [],
+    reportPdfPath: row.report_pdf_path ?? null,
+    reportGeneratedAt: row.report_generated_at ?? null,
+    reportReleasedAt: row.report_released_at ?? null,
     date: row.created_at,
   };
 }
@@ -309,7 +312,7 @@ export async function createAssessment(payload, { signal } = {}) {
     let error;
 
     while (true) {
-      ({ data, error } = await withTimeout(insertAssessment(assessmentRow(payload, omittedColumns)), 30000));
+      ({ data, error } = await withTimeout(insertAssessment(assessmentRow(payload, omittedColumns)), 20000));
 
       if (!error) break;
 
@@ -556,6 +559,77 @@ export async function listExecutionForms() {
   }
 }
 
+
+// Record counts for the dashboard tab badges, without loading the rows.
+export async function countAllRecords() {
+  const supabase = assertSupabaseClient();
+  const tables = {
+    clarity: env.supabaseAssessmentsTable,
+    readiness: env.supabaseReadinessTable,
+    execution: env.supabaseExecutionFormsTable,
+    testimonials: env.supabaseTestimonialsTable,
+  };
+  const entries = await Promise.all(Object.entries(tables).map(async ([key, table]) => {
+    const { count, error } = await supabase.from(table).select('id', { count: 'exact', head: true });
+    return [key, error ? null : count];
+  }));
+  return Object.fromEntries(entries);
+}
+
+// ── Complete Clarity Report (PDF) ──
+// Stored privately per assessment; only signed-in admins can read or write it.
+export const CLARITY_REPORTS_BUCKET = 'clarity-reports';
+
+export async function storeClarityReport(assessmentId, pdfBlob) {
+  if (!assessmentId) throw new Error('Missing assessment id.');
+  const supabase = assertSupabaseClient();
+  const path = `${assessmentId}.pdf`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(CLARITY_REPORTS_BUCKET)
+    .upload(path, pdfBlob, { contentType: 'application/pdf', upsert: true });
+  handleSupabaseError(uploadError, 'Failed to store the Clarity Report PDF.');
+
+  const { data, error } = await supabase
+    .from(env.supabaseAssessmentsTable)
+    .update({ report_pdf_path: path, report_generated_at: new Date().toISOString() })
+    .eq('id', assessmentId)
+    .select('*')
+    .single();
+  handleSupabaseError(error, 'The PDF was stored, but the record could not be updated.');
+  return mapAssessment(data);
+}
+
+export async function getClarityReportUrl(path, expiresInSeconds = 300) {
+  if (!path) throw new Error('No stored report for this record.');
+  const supabase = assertSupabaseClient();
+  const { data, error } = await supabase.storage
+    .from(CLARITY_REPORTS_BUCKET)
+    .createSignedUrl(path, expiresInSeconds);
+  handleSupabaseError(error, 'Unable to open the stored Clarity Report.');
+  return data.signedUrl;
+}
+
+// Emails the stored PDF to the client's own address and records the release.
+// Runs server-side; the function rejects anyone who is not a signed-in admin.
+export async function releaseClarityReport(assessmentId) {
+  if (!assessmentId) throw new Error('Missing assessment id.');
+  const supabase = assertSupabaseClient();
+  const { data, error } = await supabase.functions.invoke('release-clarity-report', {
+    body: { assessmentId },
+  });
+  if (error) {
+    let message = error.message;
+    try {
+      const body = await error.context?.json?.();
+      if (body?.error) message = body.error;
+    } catch {
+      // Keep the generic message.
+    }
+    throw new Error(message || 'Unable to release the Clarity Report.');
+  }
+  return data;
+}
 
 // Delete helper functions
 export async function deleteRow(tableName, id) {

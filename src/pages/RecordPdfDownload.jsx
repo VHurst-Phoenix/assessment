@@ -9,7 +9,7 @@ export default function RecordPdfDownload({ config, record, type, summary, quest
       fileName={safeName}
       document={<RecordPdf config={config} record={record} type={type} summary={summary} questions={questions} answers={answers} dimLabels={dimLabels} />}
     >
-      {({ loading }) => loading ? 'Preparing PDF…' : '📄 Download PDF'}
+      {({ loading }) => loading ? 'Preparing PDF…' : '📄 Download coach record (PDF)'}
     </PDFDownloadLink>
   );
 }

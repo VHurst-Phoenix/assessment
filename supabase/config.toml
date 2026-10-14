@@ -8,6 +8,11 @@ project_id = "lmaiextwuqylbfxxqgwn"
 # The email function itself still validates required payload fields.
 verify_jwt = false
 
+[functions.release-clarity-report]
+# Requires a signed-in user's JWT; the function also checks the admin role
+# and only ever emails the client address stored on the assessment.
+verify_jwt = true
+
 [functions.submit-testimonial]
 # The function validates its small public form payload and performs the
 # protected Clarity-record lookup with the server-side service-role key.

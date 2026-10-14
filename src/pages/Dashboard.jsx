@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
+  countAllRecords,
   listAssessments,
   listExecutionForms,
   listReadiness,
@@ -13,17 +14,27 @@ import {
 } from '../api/dbClient';
 import { getSupabaseClient } from '../lib/supabaseClient';
 import { downloadCsv } from '../utils/csvExport';
-import { formatPercent } from './toolScoring';
+import { toClarityExportRow } from '../utils/clarityExport';
+import { executionCategories, formatPercent, readinessCategories } from './toolScoring';
 import { dimLabels } from './assessmentQuestions';
-import { getFrictionVector, getGrowthEdge, getPosition } from './scoringBands';
-import { findTestimonialMatches } from '../utils/testimonialMatching';
+import { getFrictionVector, getGrowthEdge, getPosition, scoringBands } from './scoringBands';
+import { DATE_RANGES, POSITION_DESCRIPTIONS, getTrajectory, isInDateRange } from '../utils/dashboardSignals';
+import PositionMatrix from './dashboard/PositionMatrix';
+import FullResponseRecord from './dashboard/FullResponseRecord';
+import MatchedStories from './dashboard/MatchedStories';
+
+const DownloadFullReport = lazy(() => import('./DownloadFullReport'));
+
+// Acuity's appointment list — the "View Booking" convenience link (the Acuity
+// integration itself is a separate, later project).
+const ACUITY_APPOINTMENTS_URL = 'https://secure.acuityscheduling.com/appointments.php';
 import './Dashboard.css';
 
 const PAGE_SIZE = 8;
 
 const bandOrder = {
   clarity: ['Transitioner', 'Strategist', 'Executor', 'Phoenix'],
-  readiness: ['Guarded', 'Developing', 'Willing', 'All In'],
+  readiness: ['Guarded', 'Developing (25–49)', 'Willing', 'All In'],
   execution: ['Friction-Bound', 'Emergent Traction', 'Operational Cadence', 'Strategic Velocity'],
 };
 
@@ -61,6 +72,30 @@ const formatScore = (record, tab) => {
   return tab === 'clarity' ? `${record.score} / 100` : formatPercent(record.score);
 };
 
+const getBandLabel = (record) => record.archetypeName || record.band || record.archetype || '';
+
+// One ordinal gold ramp per tool (light → dark = lowest → highest band).
+const BandPill = ({ record, tab }) => {
+  const label = getBandLabel(record);
+  const step = (bandOrder[tab] || []).indexOf(label) + 1;
+  if (record.score === null || record.score === undefined) return <span className="dashboard-score">—</span>;
+  const score = tab === 'clarity' ? Number(record.score).toFixed(1) : formatPercent(record.score);
+  return <span className={`band-pill band-step-${step || 1}`}>{score}{label ? ` · ${label}` : ''}</span>;
+};
+
+const TrajectoryTag = ({ trajectory }) => {
+  if (!trajectory) return <span className="trajectory trajectory-flat">—</span>;
+  const icon = { up: '▲', down: '▼', flat: '▬', first: '•' }[trajectory.direction];
+  return <span className={`trajectory trajectory-${trajectory.direction}`}>{icon} {trajectory.label}</span>;
+};
+
+const clarityBandRange = (label) => {
+  const band = scoringBands.find((item) => item.label === label);
+  return band ? `Range ${band.min}–${band.max} of 20–100` : '';
+};
+
+const categoryNamesFor = (tab) => (tab === 'readiness' ? readinessCategories : tab === 'execution' ? executionCategories : dimLabels);
+
 const statusClass = (status) => `status-${(status || 'unknown').toLowerCase().replace(/\s+/g, '-')}`;
 
 const Dashboard = () => {
@@ -78,7 +113,13 @@ const Dashboard = () => {
   const [sort, setSort] = useState('date-desc');
   const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState(null);
+  const [dateRange, setDateRange] = useState('all');
+  const [tabCounts, setTabCounts] = useState({});
   const requestIdRef = useRef(0);
+
+  const refreshCounts = useCallback(() => {
+    countAllRecords().then(setTabCounts).catch((err) => console.warn('Unable to load tab counts:', err));
+  }, []);
 
   const getData = useCallback(async () => {
     if (activeTab === 'clarity') return listAssessments();
@@ -95,6 +136,7 @@ const Dashboard = () => {
     try {
       const result = await getData();
       if (requestId === requestIdRef.current) setData(result || []);
+      refreshCounts();
     } catch (err) {
       console.error(err);
       if (requestId === requestIdRef.current) {
@@ -104,7 +146,7 @@ const Dashboard = () => {
     } finally {
       if (requestId === requestIdRef.current) setIsLoading(false);
     }
-  }, [getData]);
+  }, [getData, refreshCounts]);
 
   useEffect(() => {
     const loadTimer = window.setTimeout(loadData, 0);
@@ -128,8 +170,9 @@ const Dashboard = () => {
       const searchable = [getName(item), item.email, item.company, item.segment, item.band, item.archetypeName, item.gap, item.status].filter(Boolean).join(' ').toLowerCase();
       const label = item.archetypeName || item.archetype || item.band || '';
       return (!query || searchable.includes(query))
-        && (!selectedSegment || item.segment === selectedSegment)
-        && (!selectedStatus || (activeTab === 'testimonials' ? item.status === selectedStatus : label === selectedStatus));
+        && (!selectedSegment || (selectedSegment === 'Unset' ? !item.segment : item.segment === selectedSegment))
+        && (!selectedStatus || (activeTab === 'testimonials' ? item.status === selectedStatus : label === selectedStatus))
+        && isInDateRange(item.date, dateRange);
     });
     return matches.sort((first, second) => {
       if (sort === 'name-asc') return getName(first).localeCompare(getName(second));
@@ -137,7 +180,14 @@ const Dashboard = () => {
       if (sort === 'score-asc') return scoreValue(first) - scoreValue(second);
       return new Date(second.date).getTime() - new Date(first.date).getTime();
     });
-  }, [activeTab, data, search, selectedSegment, selectedStatus, sort]);
+  }, [activeTab, data, search, selectedSegment, selectedStatus, sort, dateRange]);
+
+  // Trajectory uses every loaded record (not just the filtered view) so a
+  // client's earlier submission still counts when it is outside the filter.
+  const trajectories = useMemo(() => {
+    if (activeTab !== 'readiness' && activeTab !== 'execution') return {};
+    return Object.fromEntries(data.map((item) => [item.id, getTrajectory(item, data)]));
+  }, [activeTab, data]);
 
   const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -147,6 +197,8 @@ const Dashboard = () => {
   const scoredRecords = filteredData.filter((item) => item.score !== undefined && item.score !== null);
   const averageScore = scoredRecords.length ? Math.round(scoredRecords.reduce((sum, item) => sum + (Number(item.score) || 0), 0) / scoredRecords.length) : 0;
   const pendingTestimonials = filteredData.filter((item) => item.status === 'Pending Review').length;
+  const approvedTestimonialCount = filteredData.filter((item) => item.status === 'Approved').length;
+  const trendingUpCount = filteredData.filter((item) => trajectories[item.id]?.direction === 'up').length;
   const bandDistribution = (() => {
     const labels = filteredData.map((item) => item.archetypeName || item.archetype || item.band).filter(Boolean);
     const counts = labels.reduce((summary, label) => ({ ...summary, [label]: (summary[label] || 0) + 1 }), {});
@@ -157,7 +209,11 @@ const Dashboard = () => {
   const latestRecord = filteredData.slice().sort((a, b) => new Date(b.date) - new Date(a.date))[0];
   const segmentSummary = ['Individual', 'Corporate', 'Federal'].map((segment) => ({ segment, count: filteredData.filter((item) => item.segment === segment).length }));
   const maxSegmentCount = Math.max(...segmentSummary.map(({ count }) => count), 1);
-  const tabs = Object.entries(tabConfig).map(([key, config]) => ({ key, label: config.label, count: key === activeTab ? totalRecords : null }));
+  const tabs = Object.entries(tabConfig).map(([key, config]) => ({
+    key,
+    label: config.label,
+    count: tabCounts[key] ?? (key === activeTab ? data.length : null),
+  }));
 
   const handleLogout = async () => {
     try { const { client } = getSupabaseClient(); await client?.auth.signOut(); } catch (err) { console.warn('Sign out error:', err); } finally { navigate('/login'); }
@@ -184,7 +240,8 @@ const Dashboard = () => {
     setIsExporting(true); setError('');
     try {
       const scope = [activeTab, selectedSegment || 'all', selectedStatus || 'records'].join('_').replace(/\s+/g, '-').toLowerCase();
-      downloadCsv(filteredData, `Phoenix_${scope}_${new Date().toISOString().slice(0, 10)}.csv`);
+      const rows = activeTab === 'clarity' ? filteredData.map(toClarityExportRow) : filteredData;
+      downloadCsv(rows, `Phoenix_${scope}_${new Date().toISOString().slice(0, 10)}.csv`);
     } catch (err) { console.error(err); setError(err.message || 'Unable to export the current view.'); } finally { setIsExporting(false); }
   };
 
@@ -210,41 +267,120 @@ const Dashboard = () => {
 
   const selectedSignals = activeTab === 'clarity' && selectedRecord ? getClaritySignals(selectedRecord) : null;
   const selectedCategories = selectedRecord?.categoryScores?.length ? selectedRecord.categoryScores : selectedRecord?.dimScores || [];
-  const selectedMatches = activeTab === 'clarity' && selectedRecord ? findTestimonialMatches({ band: selectedRecord.archetypeName || selectedRecord.archetype, segment: selectedRecord.segment }, approvedTestimonials) : null;
+  const selectedTrajectory = selectedRecord ? trajectories[selectedRecord.id] : null;
+  const isTool = activeTab === 'readiness' || activeTab === 'execution';
+  const reportStatus = (record) => (record.reportReleasedAt
+    ? `Released to client ${formatDate(record.reportReleasedAt)}`
+    : record.reportPdfPath ? 'Stored — not yet released' : 'Not yet released');
 
   return (
     <div className="dashboard-page animate-fade-slide">
-      <section className="dashboard-hero"><div className="dashboard-hero-inner"><div><div className="dashboard-kicker">Phoenix Coach Console</div><h1>Client <em>dashboard</em></h1><p>Review client signals, manage submissions, and move from overview to meaningful client detail.</p></div><div className="dashboard-hero-actions"><button type="button" onClick={exportFilteredRows} className="btn btn-gold" disabled={isExporting || isLoading}>{isExporting ? 'Exporting…' : 'Export current view'}</button><button type="button" onClick={handleLogout} className="dashboard-logout">Log out</button></div></div></section>
-      <nav className="dashboard-tabs" aria-label="Dashboard data type"><div className="dashboard-tabs-inner" role="tablist">{tabs.map((tab) => <button type="button" key={tab.key} role="tab" aria-selected={activeTab === tab.key} className={`dashboard-tab ${activeTab === tab.key ? 'is-active' : ''}`} onClick={() => switchTab(tab.key)}>{tab.label}{tab.count !== null && <span>{tab.count}</span>}</button>)}</div></nav>
+      <section className="dashboard-hero"><div className="dashboard-hero-inner"><div><div className="dashboard-kicker">Phoenix Coach Console</div><h1>Client <em>dashboard</em></h1><p>Review assessment records, export segmented client data, and manage stories from one focused workspace.</p></div><div className="dashboard-hero-actions"><button type="button" onClick={exportFilteredRows} className="btn btn-gold" disabled={isExporting || isLoading}>{isExporting ? 'Exporting…' : '⬇ Export filtered CSV'}</button><button type="button" onClick={handleLogout} className="dashboard-logout">Log out</button></div></div></section>
+      <nav className="dashboard-tabs" aria-label="Dashboard data type"><div className="dashboard-tabs-inner" role="tablist">{tabs.map((tab) => <button type="button" key={tab.key} role="tab" aria-selected={activeTab === tab.key} className={`dashboard-tab ${activeTab === tab.key ? 'is-active' : ''}`} onClick={() => switchTab(tab.key)}>{tab.label}{tab.count !== null && tab.count !== undefined && <span>{tab.count}</span>}</button>)}</div></nav>
 
       <main className="dashboard-shell">
+        {/* Module 1 — Cohort Intelligence Bar */}
         <section className="dashboard-overview dashboard-cohort-bar" aria-label={tabConfig[activeTab].label + ' cohort intelligence'}>
-          <article className="overview-card overview-card-primary"><span className="overview-label">Total records</span><strong>{totalRecords}</strong><small>{search || selectedSegment || selectedStatus ? 'Matching current filters' : 'Across this collection'}</small></article>
-          <article className="overview-card"><span className="overview-label">{activeTab === 'testimonials' ? 'Pending review' : 'Average score'}</span><strong>{activeTab === 'testimonials' ? pendingTestimonials : activeTab === 'clarity' ? String(averageScore) : String(averageScore) + '%'}</strong><small>{activeTab === 'testimonials' ? 'Stories awaiting a decision' : activeTab === 'clarity' ? 'Out of 100 points' : 'Across scored records'}</small></article>
+          <article className="overview-card overview-card-primary"><span className="overview-label">Total records</span><strong>{totalRecords}</strong><small>{search || selectedSegment || selectedStatus || dateRange !== 'all' ? 'Matching current filters' : 'Across this collection'}</small></article>
+          {activeTab === 'clarity' && <article className="overview-card"><span className="overview-label">Average score</span><strong>{averageScore}</strong><small>Out of 100 points</small></article>}
+          {isTool && <article className="overview-card"><span className="overview-label">Trending up</span><strong>{trendingUpCount}</strong><small>of {totalRecords} vs. the client's previous check-in</small></article>}
+          {activeTab === 'testimonials' && <><article className="overview-card"><span className="overview-label">Pending review</span><strong>{pendingTestimonials}</strong><small>of {totalRecords} stories</small></article><article className="overview-card"><span className="overview-label">Approved &amp; live</span><strong>{approvedTestimonialCount}</strong><small>stories</small></article></>}
           {activeTab !== 'testimonials' && <article className="overview-card dashboard-band-distribution"><span className="overview-label">Band distribution</span><div className="band-distribution-bars">{bandDistribution.entries.map((entry, index) => <div className="band-distribution-column" key={entry.label}><i className={'band-distribution-fill band-step-' + (index + 1)} style={{ height: Math.max(8, (entry.count / bandDistribution.max) * 44) }} /><b>{entry.count}</b><small>{entry.label}</small></div>)}</div></article>}
-          <article className="overview-card overview-card-latest"><span className="overview-label">Latest received</span><strong>{latestRecord ? formatDate(latestRecord.date, { month: 'short', day: 'numeric' }) : '—'}</strong><small>{latestRecord ? getName(latestRecord) : 'No submissions yet'}</small></article>
+          <article className="overview-card overview-card-latest"><span className="overview-label">Latest entry</span><strong>{latestRecord ? formatDate(latestRecord.date, { month: 'short', day: 'numeric' }) : '—'}</strong><small>{latestRecord ? getName(latestRecord) : 'No submissions yet'}</small></article>
         </section>
 
         <section className="dashboard-controls" aria-label="Record controls">
           <label className="dashboard-search" htmlFor="dashboard-search"><span className="sr-only">Search records</span><span aria-hidden="true">⌕</span><input id="dashboard-search" type="search" value={search} onChange={updateFilter(setSearch)} placeholder="Search name, email, company…" /></label>
-          <label className="dashboard-select-label" htmlFor="dashboard-segment"><span>Segment</span><select id="dashboard-segment" value={selectedSegment} onChange={updateFilter(setSelectedSegment)}><option value="">All segments</option><option value="Individual">Individual</option><option value="Corporate">Corporate</option><option value="Federal">Federal</option></select></label>
+          <label className="dashboard-select-label" htmlFor="dashboard-date"><span>Date range</span><select id="dashboard-date" value={dateRange} onChange={updateFilter(setDateRange)}>{DATE_RANGES.map((range) => <option key={range.value} value={range.value}>{range.label}</option>)}</select></label>
+          <label className="dashboard-select-label" htmlFor="dashboard-segment"><span>Segment</span><select id="dashboard-segment" value={selectedSegment} onChange={updateFilter(setSelectedSegment)}><option value="">All segments</option><option value="Federal">Federal</option><option value="Corporate">Corporate</option><option value="Individual">Individual</option><option value="Unset">Unset</option></select></label>
           <label className="dashboard-select-label" htmlFor="dashboard-status"><span>{activeTab === 'testimonials' ? 'Status' : 'Band'}</span><select id="dashboard-status" value={selectedStatus} onChange={updateFilter(setSelectedStatus)}><option value="">{activeTab === 'testimonials' ? 'All statuses' : 'All bands'}</option>{activeTab === 'testimonials' ? ['Pending Review', 'Approved', 'Rejected'].map((status) => <option key={status} value={status}>{status}</option>) : bandOptions.map((band) => <option key={band} value={band}>{band}</option>)}</select></label>
           <label className="dashboard-select-label dashboard-sort-label" htmlFor="dashboard-sort"><span>Sort</span><select id="dashboard-sort" value={sort} onChange={updateFilter(setSort)}><option value="date-desc">Newest first</option><option value="name-asc">Name A–Z</option>{activeTab !== 'testimonials' && <><option value="score-desc">Highest score</option><option value="score-asc">Lowest score</option></>}</select></label>
           <button type="button" className="dashboard-refresh" onClick={loadData} disabled={isLoading} aria-label="Refresh records"><span aria-hidden="true">↻</span> {isLoading ? 'Refreshing' : 'Refresh'}</button>
+          <p className="dashboard-filter-note">Export respects these filters.</p>
         </section>
         {error && <div className="dashboard-error" role="alert">{error}</div>}
 
         <section className="dashboard-workspace">
-          <article className="dashboard-panel dashboard-table-panel"><header className="dashboard-panel-header"><div><div className="panel-eyebrow">{tabConfig[activeTab].label}</div><h2>{tabConfig[activeTab].collection}</h2></div><span className="panel-meta">{isLoading ? 'Loading…' : `${totalRecords} ${totalRecords === 1 ? 'record' : 'records'}`}</span></header><div className="dashboard-table-wrap"><table className="dashboard-table"><thead><tr><th className="selection-column"><span className="sr-only">Select</span></th><th>Client</th><th>Submitted</th><th>Segment</th>{activeTab !== 'testimonials' && <th>Score</th>}{activeTab === 'clarity' && <th>Focus signal</th>}{(activeTab === 'readiness' || activeTab === 'execution') && <th>Gap</th>}{activeTab === 'testimonials' && <th>Status</th>}<th><span className="sr-only">Actions</span></th></tr></thead><tbody>
-            {isLoading ? <tr><td colSpan="8"><div className="dashboard-empty"><strong>Loading {tabConfig[activeTab].label.toLowerCase()} records…</strong><span>Connecting to your existing Supabase data.</span></div></td></tr> : pageRows.length === 0 ? <tr><td colSpan="8"><div className="dashboard-empty"><strong>No matching records</strong><span>Try clearing a filter or wait for a new submission.</span></div></td></tr> : pageRows.map((item) => { const signals = activeTab === 'clarity' ? getClaritySignals(item) : null; const isSelected = String(selectedId) === String(item.id); return <tr key={item.id} className={isSelected ? 'is-selected' : ''} onClick={() => setSelectedId(item.id)}><td className="selection-column"><input type="radio" name="selected-record" aria-label={`Select ${getName(item)}`} checked={isSelected} onChange={() => setSelectedId(item.id)} /></td><td><button type="button" className="record-name" onClick={() => setSelectedId(item.id)}>{getName(item)}<span>{item.company || item.email || 'No contact details'}</span></button></td><td>{formatDate(item.date, { year: undefined })}</td><td><span className={`segment-badge segment-${(item.segment || 'unset').toLowerCase()}`}>{item.segment || 'Unassigned'}</span></td>{activeTab !== 'testimonials' && <td><span className="dashboard-score">{formatScore(item, activeTab)}</span><small className="table-subvalue">{item.archetypeName || item.band || ''}</small></td>}{activeTab === 'clarity' && <td><span className="signal-text">{signals?.growthEdge ? dimLabels[signals.growthEdge.index] : '—'}</span></td>}{(activeTab === 'readiness' || activeTab === 'execution') && <td><span className="signal-text">{item.gap || '—'}</span></td>}{activeTab === 'testimonials' && <td><span className={`status-pill ${statusClass(item.status)}`}>{item.status || 'Unknown'}</span></td>}<td><Link to={`/dashboard/record/${activeTab}/${item.id}`} className="table-open-link" onClick={(event) => event.stopPropagation()} aria-label={`Open ${getName(item)} details`}>Open</Link></td></tr>; })}
-          </tbody></table></div><footer className="dashboard-pagination"><span>{totalRecords ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, totalRecords)} of ${totalRecords}` : '0 records'}</span><div><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={currentPage === 1}>Previous</button><span>Page {currentPage} of {totalPages}</span><button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={currentPage === totalPages}>Next</button></div></footer></article>
+          {/* Module 2 — Record List */}
+          <article className="dashboard-panel dashboard-table-panel">
+            <header className="dashboard-panel-header"><div><div className="panel-eyebrow">{tabConfig[activeTab].label}</div><h2>{tabConfig[activeTab].collection}</h2></div><span className="panel-meta">{isLoading ? 'Loading…' : `${totalRecords} ${totalRecords === 1 ? 'record' : 'records'}`}</span></header>
+            <div className="dashboard-table-wrap"><table className="dashboard-table">
+              <thead><tr>
+                <th className="selection-column"><span className="sr-only">Select</span></th><th>Client</th><th>Submitted</th><th>Segment</th>
+                {activeTab === 'clarity' && <><th>Band</th><th>Position</th><th>Friction Vector</th><th>Growth Edge</th></>}
+                {activeTab === 'execution' && <><th>Checkpoint</th><th>Band</th><th>Execution Gap</th><th>Trajectory</th></>}
+                {activeTab === 'readiness' && <><th>Band</th><th>Readiness Gap</th><th>Trajectory</th></>}
+                {activeTab === 'testimonials' && <><th>Status</th><th>Matched Band</th></>}
+                <th><span className="sr-only">Actions</span></th>
+              </tr></thead>
+              <tbody>
+                {isLoading ? <tr><td colSpan="9"><div className="dashboard-empty"><strong>Loading {tabConfig[activeTab].label.toLowerCase()} records…</strong><span>Connecting to your existing Supabase data.</span></div></td></tr> : pageRows.length === 0 ? <tr><td colSpan="9"><div className="dashboard-empty"><strong>No matching records</strong><span>Try clearing a filter or wait for a new submission.</span></div></td></tr> : pageRows.map((item) => {
+                  const signals = activeTab === 'clarity' ? getClaritySignals(item) : null;
+                  const isSelected = String(selectedRecord?.id) === String(item.id);
+                  return (
+                    <tr key={item.id} className={isSelected ? 'is-selected' : ''} onClick={() => setSelectedId(item.id)}>
+                      <td className="selection-column"><input type="radio" name="selected-record" aria-label={`Select ${getName(item)}`} checked={isSelected} onChange={() => setSelectedId(item.id)} /></td>
+                      <td><button type="button" className="record-name" onClick={() => setSelectedId(item.id)}>{getName(item)}<span>{item.company || item.email || 'No contact details'}</span></button></td>
+                      <td>{formatDate(item.date, { year: undefined })}</td>
+                      <td><span className={`segment-badge segment-${(item.segment || 'unset').toLowerCase()}`}>{item.segment || 'Unset'}</span></td>
+                      {activeTab === 'clarity' && <><td><BandPill record={item} tab={activeTab} /></td><td className="signal-text">{signals?.position?.quadrant || '—'}</td><td className="signal-text">{signals?.frictionVector?.archetype || '—'}</td><td className="signal-text growth-text">{signals?.growthEdge ? dimLabels[signals.growthEdge.index] : '—'}</td></>}
+                      {activeTab === 'execution' && <><td>{item.programCheckpoint || '—'}</td><td><BandPill record={item} tab={activeTab} /></td><td className="signal-text">{item.gap || '—'}</td><td><TrajectoryTag trajectory={trajectories[item.id]} /></td></>}
+                      {activeTab === 'readiness' && <><td><BandPill record={item} tab={activeTab} /></td><td className="signal-text">{item.gap || '—'}</td><td><TrajectoryTag trajectory={trajectories[item.id]} /></td></>}
+                      {activeTab === 'testimonials' && <><td><span className={`status-pill ${statusClass(item.status)}`}>{item.status || 'Unknown'}</span></td><td className="signal-text">{item.band || '—'} {item.band && <span className={`source-tag ${item.bandSource === 'verified' ? 'source-verified' : 'source-self'}`}>{item.bandSource || 'self-reported'}</span>}</td></>}
+                      <td><Link to={`/dashboard/record/${activeTab}/${item.id}`} className="table-open-link" onClick={(event) => event.stopPropagation()} aria-label={`Open ${getName(item)} details`}>Open</Link></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table></div>
+            <footer className="dashboard-pagination"><span>{totalRecords ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, totalRecords)} of ${totalRecords}` : '0 records'}</span><div><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={currentPage === 1}>Previous</button><span>Page {currentPage} of {totalPages}</span><button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={currentPage === totalPages}>Next</button></div></footer>
+          </article>
 
-          <aside className="dashboard-side-panel" aria-live="polite">{selectedRecord ? <article className="dashboard-panel record-focus-panel"><header className="dashboard-panel-header focus-header"><div><div className="panel-eyebrow">Selected record</div><h2>{getName(selectedRecord)}</h2><p>{selectedRecord.company || selectedRecord.email || 'No company provided'} · {formatDate(selectedRecord.date)}</p></div>{activeTab === 'testimonials' ? <span className={`status-pill ${statusClass(selectedRecord.status)}`}>{selectedRecord.status || 'Unknown'}</span> : <span className="focus-type">{tabConfig[activeTab].label}</span>}</header><div className="focus-content">
-            {activeTab === 'clarity' && <><div className="focus-output-grid"><div><span>Score</span><strong>{formatScore(selectedRecord, activeTab)}</strong></div><div><span>Band</span><strong>{selectedRecord.archetypeName || selectedRecord.archetype || '—'}</strong></div><div><span>Position</span><strong>{selectedSignals?.position?.quadrant || '—'}</strong></div><div><span>Growth edge</span><strong>{selectedSignals?.growthEdge ? dimLabels[selectedSignals.growthEdge.index] : '—'}</strong></div></div><section className="focus-section"><h3>Dimension profile</h3>{selectedCategories.length ? selectedCategories.map((score, index) => <div className="dimension-row" key={dimLabels[index] || index}><span>{dimLabels[index] || `Dimension ${index + 1}`}</span><div><i style={{ width: `${Math.min(100, Math.max(0, (Number(score) / 20) * 100))}%` }} /></div><b>{Number(score).toFixed(0)}</b></div>) : <p className="focus-muted">Dimension responses are unavailable for this record.</p>}</section><section className="focus-callout"><span>Friction vector</span><strong>{selectedSignals?.frictionVector?.archetype || 'Not available'}</strong>{selectedMatches && <small>{selectedMatches.tier1.length + selectedMatches.tier2.length} approved story match{selectedMatches.tier1.length + selectedMatches.tier2.length === 1 ? '' : 'es'} found</small>}</section></>}
-            {(activeTab === 'readiness' || activeTab === 'execution') && <><div className="focus-output-grid"><div><span>Score</span><strong>{formatScore(selectedRecord, activeTab)}</strong></div><div><span>Band</span><strong>{selectedRecord.band || '—'}</strong></div><div><span>Primary gap</span><strong>{selectedRecord.gap || '—'}</strong></div><div><span>{activeTab === 'readiness' ? 'Session' : 'Checkpoint'}</span><strong>{activeTab === 'readiness' ? selectedRecord.sessionType || '—' : selectedRecord.programCheckpoint || '—'}</strong></div></div>{selectedCategories.length > 0 && <section className="focus-section"><h3>Category profile</h3>{selectedCategories.map((score, index) => <div className="dimension-row" key={index}><span>Category {index + 1}</span><div><i style={{ width: `${Math.min(100, Math.max(0, Number(score)))}%` }} /></div><b>{Number(score).toFixed(0)}%</b></div>)}</section>}{activeTab === 'execution' && selectedRecord.notes && <section className="focus-callout"><span>Coach notes</span><strong>{selectedRecord.notes}</strong></section>}</>}
-            {activeTab === 'testimonials' && <><div className="focus-output-grid"><div><span>Status</span><strong>{selectedRecord.status || '—'}</strong></div><div><span>Band</span><strong>{selectedRecord.band || '—'}</strong></div><div><span>Source</span><strong>{selectedRecord.bandSource || 'Self-reported'}</strong></div><div><span>Segment</span><strong>{selectedRecord.segment || 'Unassigned'}</strong></div></div><section className="story-preview"><div><span>Before</span><p>{selectedRecord.before || 'No response provided.'}</p></div><div><span>The shift</span><p>{selectedRecord.shift || 'No response provided.'}</p></div><div><span>After</span><p>{selectedRecord.after || 'No response provided.'}</p></div></section></>}
-            <div className="focus-actions"><Link to={`/dashboard/record/${activeTab}/${selectedRecord.id}`} className="btn btn-primary">View full record</Link>{activeTab === 'testimonials' && selectedRecord.status === 'Pending Review' && <><button type="button" className="focus-approve" onClick={() => updateTestimonial(selectedRecord.id, 'Approved')}>Approve</button><button type="button" className="focus-reject" onClick={() => updateTestimonial(selectedRecord.id, 'Rejected')}>Reject</button></>}</div><div className="focus-danger-zone">{confirmDeleteId === selectedRecord.id ? <><span>Delete this record?</span><button type="button" onClick={() => deleteItemHandler(selectedRecord.id)}>Yes, delete</button><button type="button" onClick={() => setConfirmDeleteId(null)}>Cancel</button></> : <button type="button" onClick={() => setConfirmDeleteId(selectedRecord.id)}>Delete record</button>}</div>
-          </div></article> : <article className="dashboard-panel dashboard-empty-focus"><div className="panel-eyebrow">Record context</div><h2>Select a record</h2><p>Choose a row to see its score, signals, and available actions here.</p></article>}
+          {/* Module 3 — Client Detail Inspection Panel */}
+          <aside className="dashboard-side-panel" aria-live="polite">{selectedRecord ? <article className="dashboard-panel record-focus-panel">
+            <header className="dashboard-panel-header focus-header"><div><div className="panel-eyebrow">Client detail</div><h2>{getName(selectedRecord)}</h2><p>{selectedRecord.company || selectedRecord.email || 'No company provided'} · {formatDate(selectedRecord.date)}</p></div><span className={`segment-badge segment-${(selectedRecord.segment || 'unset').toLowerCase()}`}>{selectedRecord.segment || 'Unset'}</span></header>
+            <div className="focus-content">
+              {activeTab === 'clarity' && <>
+                <div className="focus-output-grid">
+                  <div><span>Band</span><strong>{selectedRecord.score ?? '—'} · {getBandLabel(selectedRecord) || '—'}</strong><small>{clarityBandRange(getBandLabel(selectedRecord))}</small></div>
+                  <div><span>Position</span><strong>{selectedSignals?.position?.quadrant || '—'}</strong><small>{POSITION_DESCRIPTIONS[selectedSignals?.position?.quadrant] || ''}</small></div>
+                  <div><span>Friction Vector</span><strong>{selectedSignals?.frictionVector?.archetype || '—'}</strong><small>{selectedSignals?.frictionVector ? `Focus: ${selectedSignals.frictionVector.weakerDimension}` : ''}</small></div>
+                  <div><span>Growth Edge</span><strong>{selectedSignals?.growthEdge ? dimLabels[selectedSignals.growthEdge.index] : '—'}</strong><small>{selectedSignals?.growthEdge ? `${selectedSignals.growthEdge.score} / 20` : ''}</small></div>
+                </div>
+                <section className="focus-section"><h3>Position matrix</h3><PositionMatrix position={selectedSignals?.position} /></section>
+                <section className="focus-section"><h3>Five categories</h3>{selectedCategories.length ? selectedCategories.map((score, index) => <div className="dimension-row" key={dimLabels[index] || index}><span>{dimLabels[index] || `Dimension ${index + 1}`}</span><div><i style={{ width: `${Math.min(100, Math.max(0, (Number(score) / 20) * 100))}%` }} /></div><b>{Number(score).toFixed(1)}</b></div>) : <p className="focus-muted">Dimension responses are unavailable for this record.</p>}</section>
+                <section className="focus-section"><h3>Matched stories</h3><MatchedStories record={selectedRecord} testimonials={approvedTestimonials} /></section>
+                <section className="focus-section"><h3>Full response record</h3><FullResponseRecord key={selectedRecord.id} type="clarity" record={selectedRecord} /></section>
+                <section className="focus-callout"><span>Complete Clarity Report</span><strong>{reportStatus(selectedRecord)}</strong><small>Download it below for your review. Store and release it to the client from the full record once they have booked.</small></section>
+              </>}
+
+              {isTool && <>
+                <div className="gap-hero">
+                  <span>{activeTab === 'execution' ? `Execution Band · ${selectedRecord.programCheckpoint || 'No checkpoint'}` : `Readiness Band · ${selectedRecord.sessionType || 'No session type'}`}</span>
+                  <strong>{formatScore(selectedRecord, activeTab)} · {selectedRecord.band || '—'}</strong>
+                  <p>Single consolidated signal — no 2×2 Position for {activeTab === 'execution' ? 'Execution' : 'Readiness'}, by locked decision.</p>
+                  <TrajectoryTag trajectory={selectedTrajectory} />
+                </div>
+                <div className="focus-output-grid">
+                  <div><span>{activeTab === 'execution' ? 'Execution Gap' : 'Readiness Gap'}</span><strong>{selectedRecord.gap || '—'}</strong></div>
+                  <div><span>Trajectory</span><strong>{selectedTrajectory?.label || '—'}</strong><small>{selectedTrajectory?.change !== undefined ? `${selectedTrajectory.change > 0 ? '+' : ''}${selectedTrajectory.change.toFixed(1)} pts vs. previous` : ''}</small></div>
+                </div>
+                {selectedCategories.length > 0 && <section className="focus-section"><h3>Three categories</h3>{selectedCategories.map((category, index) => { const score = typeof category === 'object' ? category.score : category; const name = (typeof category === 'object' && category.name) || categoryNamesFor(activeTab)[index]; return <div className="dimension-row" key={name || index}><span>{name}</span><div><i style={{ width: `${Math.min(100, Math.max(0, Number(score)))}%` }} /></div><b>{Number(score).toFixed(0)}%</b></div>; })}</section>}
+                {activeTab === 'execution' && selectedRecord.notes && <section className="focus-callout"><span>Coach notes</span><strong>{selectedRecord.notes}</strong></section>}
+                <section className="focus-section"><h3>Full response record</h3><FullResponseRecord key={selectedRecord.id} type={activeTab} record={selectedRecord} /></section>
+              </>}
+
+              {activeTab === 'testimonials' && <><div className="focus-output-grid"><div><span>Status</span><strong>{selectedRecord.status || '—'}</strong></div><div><span>Band</span><strong>{selectedRecord.band || '—'}</strong></div><div><span>Source</span><strong>{selectedRecord.bandSource || 'Self-reported'}</strong></div><div><span>Segment</span><strong>{selectedRecord.segment || 'Unset'}</strong></div></div><section className="story-preview"><div><span>Before</span><p>{selectedRecord.before || 'No response provided.'}</p></div><div><span>The shift</span><p>{selectedRecord.shift || 'No response provided.'}</p></div><div><span>After</span><p>{selectedRecord.after || 'No response provided.'}</p></div></section></>}
+
+              <div className="focus-actions">
+                {activeTab === 'clarity' && <Suspense fallback={<span className="btn btn-gold">Preparing report…</span>}><DownloadFullReport key={selectedRecord.id} record={selectedRecord} /></Suspense>}
+                <Link to={`/dashboard/record/${activeTab}/${selectedRecord.id}`} className="btn btn-primary">{activeTab === 'clarity' ? 'Open record · store & release report' : 'View full record'}</Link>
+                {activeTab !== 'testimonials' && <a href={ACUITY_APPOINTMENTS_URL} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">📅 View booking</a>}
+                {activeTab === 'testimonials' && selectedRecord.status === 'Pending Review' && <><button type="button" className="focus-approve" onClick={() => updateTestimonial(selectedRecord.id, 'Approved')}>Approve</button><button type="button" className="focus-reject" onClick={() => updateTestimonial(selectedRecord.id, 'Rejected')}>Reject</button></>}
+              </div>
+              <div className="focus-danger-zone">{confirmDeleteId === selectedRecord.id ? <><span>Delete this record?</span><button type="button" onClick={() => deleteItemHandler(selectedRecord.id)}>Yes, delete</button><button type="button" onClick={() => setConfirmDeleteId(null)}>Cancel</button></> : <button type="button" onClick={() => setConfirmDeleteId(selectedRecord.id)}>Delete record</button>}</div>
+            </div>
+          </article> : <article className="dashboard-panel dashboard-empty-focus"><div className="panel-eyebrow">Client detail</div><h2>Select a record</h2><p>Choose a row to see its Band, Position, Friction Vector, Growth Edge and matched stories here.</p></article>}
           <article className="dashboard-panel cohort-panel"><header><div className="panel-eyebrow">Cohort pulse</div><h2>Segment distribution</h2></header><div className="cohort-bars">{segmentSummary.map(({ segment, count }) => <div className="cohort-row" key={segment}><span>{segment}</span><div><i style={{ width: `${(count / maxSegmentCount) * 100}%` }} /></div><b>{count}</b></div>)}</div><p>Counts reflect the records currently visible in the table.</p></article></aside>
         </section>
       </main>
