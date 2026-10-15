@@ -6,7 +6,8 @@ export function getFrictionVector(categoryScores, position) {
 
   const [strengths, values, , direction, alignment] = categoryScores.map(Number);
   if (![strengths, values, direction, alignment].every(Number.isFinite)) return null;
-  const lowerAxis = position.innerAxis <= position.outerAxis ? 'inner' : 'outer';
+  // Inner lags only when strictly lower; an exact tie means Outer lags.
+  const lowerAxis = position.innerAxis < position.outerAxis ? 'inner' : 'outer';
   const weakerDimension = lowerAxis === 'inner'
     ? (values <= direction ? 'Values & What Matters' : 'Direction & Opportunity')
     : (strengths <= alignment ? 'Strengths & Skills' : 'Alignment & Confidence');

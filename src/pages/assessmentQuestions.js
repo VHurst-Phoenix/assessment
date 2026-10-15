@@ -80,26 +80,3 @@ export const executionQuestions = [
   "I am learning from what isn't working, not just celebrating what is.",
   "I believe I can sustain this growth beyond the end of our program.",
 ];
-
-export const archetypes = {
-  phoenix: {
-    name: "Phoenix",
-    intro: `You are in the Phoenix band.\n\nYou have done the hard work of figuring it out. The direction is real. The building is happening. What your scores show is that the gap right now isn't capability or clarity — it's the faith to trust what you're building before the results are fully visible. You're closer than you think.`,
-    directRead: `Your scores reveal something most people in your position never get told.\n\nYou have done the hard work of figuring it out. The direction is real. The building is happening. What your scores show is that the gap right now isn't capability or clarity — it's the faith to trust what you're building before the results are fully visible. That is one of the hardest phases of any transformation. Most people stop here because they can't see the proof yet. The Clarity Intensive is where we map exactly what the next chapter requires — and build the conviction to see it through.\n\nBook it.`
-  },
-  strategist: {
-    name: "Strategist",
-    intro: `You are in the Strategist band.\n\nYou can see the shift taking place — and you're beginning to live in a "new direction" way of thinking. The next obstacle isn't your ability to understand what's right; it's your willingness to bet on it even before the world confirms it.`,
-    directRead: `Your scores reveal something most people in your position never get told.\n\nYou're not stuck because you lack clarity — you scored well there. You're stuck because some part of you doesn't yet believe you're allowed to have what you can see. That belief gap shows up as hesitation, self-editing, or "waiting for certainty" that never comes.\n\nThe Clarity Intensive names the pattern and gives you a single, clear conversation that turns insight into conviction — and conviction into the kind of follow-through that changes outcomes.\n\nBook it.`
-  },
-  transitioner: {
-    name: "Transitioner",
-    intro: `You are in the Transitioner band.\n\nYou're not starting from zero. You're in the season where the work is real, but the results are still in progress. The gap isn't typically ability — it's consistency of belief. When you don't yet feel the "proof," your mind may quietly try to protect you by downgrading the plan.`,
-    directRead: `Your scores reveal something most people in your position never get told.\n\nYou're not starting from zero. You're in the season where the work is real, but the results are still in progress. The gap isn't typically ability — it's consistency of belief. When you don't yet feel the "proof," your mind may quietly try to protect you by downgrading the plan.\n\nThe Clarity Intensive helps you turn what you already understand into a next step you can follow through on — with a belief structure strong enough to carry you until the tangible outcomes arrive.\n\nBook it.`
-  },
-  executor: {
-    name: "Executor",
-    intro: `You are in the Executor band.\n\nYou're not just understanding what to do — you're ready to move it into the world. Your clarity is deepening, your confidence is stabilizing, and your next chapter is starting to take shape through action.`,
-    directRead: `Your scores reveal something most people in your position never get told.\n\nThis is the season where belief becomes behavior. You've already done enough internal work that the remaining challenge is focus: choosing the right moves, protecting your energy, and staying consistent when things feel fast or uncertain.\n\nYour clarity isn't theoretical anymore — it's operational. You're poised to translate insight into decisions, and decisions into results.\n\nThe Clarity Intensive helps you lock in your next step so you can keep rising with less doubt and more momentum.\n\nBook it.`
-  }
-};

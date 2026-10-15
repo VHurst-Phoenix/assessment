@@ -1,4 +1,7 @@
-export const CLARITY_CONSENT_VERSION = '2026-09-05';
+// Bump this whenever the Clarity notice text changes. The Supabase insert
+// policy for assessments must list the same value.
+export const CLARITY_CONSENT_VERSION = '2026-10-14';
+export const CONSENT_CONTACT_EMAIL = 'veta.hurst@phoenixclearinsight.com';
 export const READINESS_CONSENT_VERSION = '1.0';
 export const EXECUTION_CONSENT_VERSION = '1.0';
 

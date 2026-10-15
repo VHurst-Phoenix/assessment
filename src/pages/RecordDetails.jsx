@@ -12,11 +12,12 @@ import {
   executionQuestions,
   dimLabels,
 } from './assessmentQuestions';
-import { MAX_CATEGORY_SCORE, getCategoryScores, getClarityScore, getRawTotal, getScoringBand, getPosition, getFrictionVector, getGrowthEdge } from './scoringBands';
+import { MAX_CATEGORY_SCORE, getCategoryScores, getClarityScore, getScoringBand, getPosition, getFrictionVector, getGrowthEdge } from './scoringBands';
 import { formatPercent, getExecutionResults, getReadinessResults } from './toolScoring';
 import './RecordDetails.css';
 
 const RecordPdfDownload = lazy(() => import('./RecordPdfDownload'));
+const ClarityReportPanel = lazy(() => import('./ClarityReportPanel'));
 
 // Maps the :type route param to the right fetch function and display config.
 // Reuses the exact same list functions Dashboard.jsx already calls — no new
@@ -137,9 +138,6 @@ const RecordDetail = () => {
   const categoryScores = config.hasDimensions
     ? (hasCompleteClarityResponses ? getCategoryScores(answers) : record.dimScores)
     : null;
-  const clarityRawScore = config.hasDimensions
-    ? (hasCompleteClarityResponses ? getRawTotal(answers) : record.rawScore ?? null)
-    : null;
   const band = config.hasBand ? getScoringBand(clarityScore) : null;
   const position = config.hasDimensions && categoryScores ? getPosition(categoryScores) : null;
   const frictionVector = config.hasDimensions && categoryScores && position ? getFrictionVector(categoryScores, position) : null;
@@ -151,7 +149,7 @@ const RecordDetail = () => {
       <div className="record-detail-toolbar no-print">
         <Link to="/dashboard" className="btn btn-secondary">← Back to Dashboard</Link>
         <Suspense fallback={<span className="btn btn-gold">Preparing export…</span>}>
-          <RecordPdfDownload config={config} record={record} type={type} summary={{ clarityScore, clarityRawScore, categoryScores, band, position, frictionVector, growthEdge, toolResults }} questions={questions} answers={answers} dimLabels={dimLabels} />
+          <RecordPdfDownload config={config} record={record} type={type} summary={{ clarityScore, categoryScores, band, position, frictionVector, growthEdge, toolResults }} questions={questions} answers={answers} dimLabels={dimLabels} />
         </Suspense>
       </div>
 
@@ -165,6 +163,14 @@ const RecordDetail = () => {
             <span>{record.date ? new Date(record.date).toLocaleString() : '—'}</span>
           </div>
         </div>
+
+        {type === 'clarity' && (
+          <div className="no-print">
+            <Suspense fallback={<div className="record-section">Loading report controls…</div>}>
+              <ClarityReportPanel record={record} onRecordChange={setRecord} />
+            </Suspense>
+          </div>
+        )}
 
         {config.isTestimonial ? (
           <div className="record-section">
@@ -193,9 +199,7 @@ const RecordDetail = () => {
               {config.hasDimensions ? (
                 <div className="record-score-card">
                   <span className="record-score-label">Clarity Score</span>
-                  <strong>{clarityScore ?? '—'} / 100</strong>
-                  {clarityRawScore !== null && <small>Adjusted response total: {clarityRawScore} / 125</small>}
-                </div>
+                  <strong>{clarityScore ?? '—'} / 100</strong>                </div>
               ) : (
                 <div className="record-score-card">
                   <span className="record-score-label">Score</span>

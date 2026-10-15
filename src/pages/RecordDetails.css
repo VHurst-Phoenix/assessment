@@ -261,3 +261,33 @@
     padding: 24px 22px;
   }
 }
+.clarity-report-panel {
+  border-left: 4px solid var(--gold, #D4A056);
+}
+
+.clarity-report-status,
+.clarity-report-help {
+  margin: 0 0 8px;
+}
+
+.clarity-report-help {
+  color: var(--muted, #6B6B7B);
+  font-size: 0.9rem;
+}
+
+.clarity-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.clarity-report-message {
+  color: #2D6A4F;
+  margin: 12px 0 0;
+}
+
+.clarity-report-error {
+  color: #8B2635;
+  margin: 12px 0 0;
+}
