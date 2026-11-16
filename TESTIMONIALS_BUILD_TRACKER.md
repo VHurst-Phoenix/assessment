@@ -43,6 +43,7 @@ Every item is built and tested on branch `feature/testimonial-form-v1.2` as of 2
 | 2026-11-16 | **Question 5 (acceptance item 5).** "Assessment only" stories are flagged as Feedback and kept off the Client Stories page. Should they also be kept out of social media, sales and case-study use? | |
 | 2026-11-16 | **Issue 1 (V5).** The Client Stories page couldn't show any story: visitors were never allowed to read the stories table, so it always said "No stories available yet". It now reads through a database function that returns only approved, consented stories cleared for the page, with only the public fields. | |
 | 2026-11-16 | **Issue 2 (existing stories).** No story submitted before this build has consent on file, so none can be published, as the request notes. Do you want to email past submitters a link to resubmit with consent? | |
+| 2026-11-16 | **Decision (home page).** Approved stories now also show on the home page, as a Client Stories section (up to 3 quote cards, plus "Read all stories" and "Share your story"). The home page counts as part of the "Client Stories page" placement. A story appears there only when the client ticked "Client Stories page" (other boxes may be ticked too) **and** an admin has approved it in the dashboard. With no such story, the home page shows the original "Share your transformation story" card. | Confirmed by Israel on Veta's behalf, 2026-11-16 |
 | 2026-11-16 | **Enhancement 1 (M14).** Email Veta automatically when someone asks to tell their story in a call. | |
 
 ## How it goes live
