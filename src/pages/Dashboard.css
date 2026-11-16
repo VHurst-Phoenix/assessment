@@ -95,3 +95,4 @@
 .frr-email-note { font-size: 11px; color: #6b7a99; font-style: italic; margin: 8px 0 0; }
 
 .focus-actions { flex-wrap: wrap; }
+.frr-set-label { margin: 0 0 12px; font-size: 11px; font-weight: 700; color: #8c5a16; background: #fbf0da; padding: 6px 10px; border-radius: 6px; }

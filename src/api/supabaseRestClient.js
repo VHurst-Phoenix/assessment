@@ -3,6 +3,7 @@ import { env } from '../config/env';
 import { getCategoryScores, getClarityScore, getRawTotal, getScoringBand } from '../pages/scoringBands';
 import { clarityQuestions, executionQuestions, readinessQuestions } from '../pages/assessmentQuestions';
 import { getExecutionResults, getReadinessResults } from '../pages/toolScoring';
+import { getQuestionSetFor } from '../pages/questionSetVersions';
 
 const archetypeNames = {
   transitioner: 'Transitioner',
@@ -66,8 +67,10 @@ export function mapAssessment(row) {
   if (!row) return null;
   const answers = Array.isArray(row.responses) ? row.responses : [];
   const hasCompleteResponses = answers.length === clarityQuestions.length;
-  const correctedRawScore = hasCompleteResponses ? getRawTotal(answers) : row.raw_score;
-  const correctedScore = hasCompleteResponses ? getClarityScore(answers) : row.score;
+  // Score against the question set that was live when this was submitted.
+  const questionSet = getQuestionSetFor(row.created_at);
+  const correctedRawScore = hasCompleteResponses ? getRawTotal(answers, questionSet.questions) : row.raw_score;
+  const correctedScore = hasCompleteResponses ? getClarityScore(answers, questionSet.questions) : row.score;
   const correctedBand = hasCompleteResponses ? getScoringBand(correctedScore) : null;
   return {
     id: row.id,
@@ -87,7 +90,8 @@ export function mapAssessment(row) {
     score: correctedScore,
     archetype: correctedBand?.key || row.archetype,
     archetypeName: correctedBand?.label || archetypeNames[row.archetype] || row.archetype || '',
-    categoryScores: hasCompleteResponses ? getCategoryScores(answers) : null,
+    categoryScores: hasCompleteResponses ? getCategoryScores(answers, questionSet.questions) : null,
+    questionSetId: questionSet.id,
     dimScores: Array.isArray(row.dim_scores) ? row.dim_scores : [],
     reportPdfPath: row.report_pdf_path ?? null,
     reportGeneratedAt: row.report_generated_at ?? null,

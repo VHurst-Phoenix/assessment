@@ -12,6 +12,7 @@ import {
   getScoringBandByKey,
 } from './scoringBands.js';
 import { getDimensionNarrative, narrativeTier } from './clarityNarratives.js';
+import { getQuestionSetFor } from './questionSetVersions.js';
 
 export const formatScore = (score) => (Number.isInteger(Number(score)) ? String(Number(score)) : Number(score).toFixed(1));
 
@@ -20,11 +21,13 @@ export function buildClarityReport(data) {
   const answers = Array.isArray(data.answers) ? data.answers : Array.isArray(data.responses) ? data.responses : [];
   const hasAllAnswers = answers.length === clarityQuestions.length && !answers.includes(null);
 
-  // Prefer the stored raw responses so every surface uses the current model.
+  // Prefer the stored raw responses so every surface uses the current model,
+  // scored against the question set that was live when the record was made.
+  const { questions } = getQuestionSetFor(data.date);
   const categoryScores = hasAllAnswers
-    ? getCategoryScores(answers)
+    ? getCategoryScores(answers, questions)
     : (Array.isArray(data.dimScores) && data.dimScores.length === 5 ? data.dimScores : []);
-  const score = hasAllAnswers ? getClarityScore(answers) : Number(data.score) || 0;
+  const score = hasAllAnswers ? getClarityScore(answers, questions) : Number(data.score) || 0;
   const band = getScoringBand(score) || getScoringBandByKey(data.archetype);
   const position = getPosition(categoryScores);
   const frictionVector = getFrictionVector(categoryScores, position);
