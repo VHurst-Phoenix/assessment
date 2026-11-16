@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { listTestimonials } from '../api/dbClient';
+import { listPublishedStories } from '../api/dbClient';
 import './ClientStoriesPage.css';
 
 const ClientStoriesPage = () => {
@@ -9,7 +9,9 @@ const ClientStoriesPage = () => {
   useEffect(() => {
     const loadStories = async () => {
       try {
-        const approved = await listTestimonials({ status: 'Approved' });
+        // Only approved, consented stories cleared for this page, with only
+        // the public fields (name per the client's choice, role, story, Band).
+        const approved = await listPublishedStories('client_stories');
         setStories(approved);
         setError(null);
       } catch (err) {
@@ -50,16 +52,18 @@ const ClientStoriesPage = () => {
                 <div className="story-profile">
                   <div className="story-avatar">✦</div>
                   <div>
-                    <h3>{story.anonymous === 'Yes' ? 'Anonymous Client' : `${story.firstName} ${story.lastName}`}</h3>
+                    <h3>{story.displayName}</h3>
                     {story.role && <p className="story-role">{story.role}</p>}
                   </div>
                 </div>
-                {story.showBand && story.band && (
+                {story.band && (
                   <span className="story-badge">
                     {story.band}
                   </span>
                 )}
               </div>
+
+              {story.quote && <blockquote className="story-quote">“{story.quote}”</blockquote>}
 
               <div className="story-timeline">
                 <div className="timeline-block before">
