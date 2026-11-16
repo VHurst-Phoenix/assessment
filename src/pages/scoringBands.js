@@ -35,9 +35,11 @@ export const getAdjustedResponse = (answer, question) => {
   return value && question?.reverse ? (MAX_OPTION_VALUE + 1) - value : value;
 };
 
-export const getRawTotal = (answers) => {
+// `questions` defaults to the current set; pass an earlier set (see
+// questionSetVersions.js) to score a record against the items it was answered on.
+export const getRawTotal = (answers, questions = clarityQuestions) => {
   if (!Array.isArray(answers)) return 0;
-  return clarityQuestions.reduce(
+  return questions.reduce(
     (total, question, index) => total + getAdjustedResponse(answers[index], question),
     0,
   );
@@ -47,17 +49,17 @@ export const getRawTotal = (answers) => {
  * Returns normalized category scores. Each category contains five adjusted
  * 1–5 marks and is multiplied by 0.8, giving a 4–20 range.
  */
-export const getCategoryScores = (answers) => {
+export const getCategoryScores = (answers, questions = clarityQuestions) => {
   if (!Array.isArray(answers)) return [0, 0, 0, 0, 0];
   const categories = Array(CATEGORY_COUNT).fill(0);
-  clarityQuestions.forEach((question, index) => {
+  questions.forEach((question, index) => {
     categories[question.dim] += getAdjustedResponse(answers[index], question);
   });
   return categories.map((score) => roundScore(score * 0.8));
 };
 
-export const getClarityScore = (answers) => {
-  return roundScore((getRawTotal(answers) / MAX_RAW_SCORE) * 100);
+export const getClarityScore = (answers, questions = clarityQuestions) => {
+  return roundScore((getRawTotal(answers, questions) / MAX_RAW_SCORE) * 100);
 };
 
 export const getGrowthEdge = (categoryScores) => {

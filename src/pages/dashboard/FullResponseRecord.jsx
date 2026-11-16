@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { clarityDimensions, clarityQuestions, executionQuestions, readinessQuestions } from '../assessmentQuestions.js';
+import { clarityDimensions, executionQuestions, readinessQuestions } from '../assessmentQuestions.js';
+import { getQuestionSetFor } from '../questionSetVersions.js';
 import { executionCategories, readinessCategories } from '../toolScoring.js';
 import { buildEmailHTML, SUMMARY_EMAIL_SUBJECT } from '../../utils/emailService';
 
@@ -9,13 +10,15 @@ import { buildEmailHTML, SUMMARY_EMAIL_SUBJECT } from '../../utils/emailService'
 const AGREEMENT = ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'];
 const READINESS = ['Not at all', 'Slightly', 'Moderately', 'Very', 'Extremely'];
 
-function getQuestionSet(type) {
+function getQuestionSet(type, date) {
   if (type === 'clarity') {
+    const set = getQuestionSetFor(date);
     return {
-      scale: AGREEMENT,
+      scale: set.scale,
+      label: set.label,
       categories: clarityDimensions.map((name, dim) => ({
         name,
-        items: clarityQuestions
+        items: set.questions
           .map((question, index) => ({ number: index + 1, text: question.text, reverse: Boolean(question.reverse), dim: question.dim }))
           .filter((item) => item.dim === dim),
       })),
@@ -35,7 +38,7 @@ function getQuestionSet(type) {
 export default function FullResponseRecord({ type, record }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState('coach');
-  const questionSet = useMemo(() => getQuestionSet(type), [type]);
+  const questionSet = useMemo(() => getQuestionSet(type, record?.date), [type, record?.date]);
   const answers = Array.isArray(record?.answers) ? record.answers : [];
   const total = questionSet.categories.reduce((sum, category) => sum + category.items.length, 0);
   const emailHtml = useMemo(() => (open && view === 'email' && type === 'clarity' ? buildEmailHTML(record) : ''), [open, view, type, record]);
@@ -52,6 +55,7 @@ export default function FullResponseRecord({ type, record }) {
             <button type="button" role="tab" aria-selected={view === 'email'} className={view === 'email' ? 'is-active' : ''} onClick={() => setView('email')}>Client Email View</button>
           </div>
           <div className="frr-body">
+            {view === 'coach' && questionSet.label && <p className="frr-set-label">{questionSet.label}</p>}
             {view === 'coach' ? (
               answers.length === 0 ? <p className="frr-empty">No responses are stored for this record.</p> : questionSet.categories.map((category) => (
                 <div className="frr-category" key={category.name}>

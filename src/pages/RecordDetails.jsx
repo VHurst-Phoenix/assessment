@@ -14,6 +14,7 @@ import {
 } from './assessmentQuestions';
 import { MAX_CATEGORY_SCORE, getCategoryScores, getClarityScore, getScoringBand, getPosition, getFrictionVector, getGrowthEdge } from './scoringBands';
 import { formatPercent, getExecutionResults, getReadinessResults } from './toolScoring';
+import { getQuestionSetFor } from './questionSetVersions';
 import './RecordDetails.css';
 
 const RecordPdfDownload = lazy(() => import('./RecordPdfDownload'));
@@ -30,17 +31,8 @@ const typeConfig = {
 };
 
 const questionSetByType = {
-  clarity: clarityQuestions.map((q) => q.text),
   readiness: readinessQuestions,
   execution: executionQuestions,
-};
-
-const clarityChoiceLabels = {
-  1: 'Strongly Disagree',
-  2: 'Disagree',
-  3: 'Neutral',
-  4: 'Agree',
-  5: 'Strongly Agree',
 };
 
 const getAnswerList = (record) => {
@@ -49,14 +41,14 @@ const getAnswerList = (record) => {
   return [];
 };
 
-const formatChoice = (type, value) => {
+const formatChoice = (scale, value) => {
   if (value === null || value === undefined || value === '') return '—';
 
   const numericValue = Number(value);
   const score = Number.isFinite(numericValue) ? numericValue : value;
 
-  if (type === 'clarity' && clarityChoiceLabels[numericValue]) {
-    return `${score} / 5 - ${clarityChoiceLabels[numericValue]}`;
+  if (scale?.[numericValue - 1]) {
+    return `${score} / 5 - ${scale[numericValue - 1]}`;
   }
 
   return `${score} / 5`;
@@ -124,8 +116,10 @@ const RecordDetail = () => {
   }
 
   // Recompute every complete Clarity record from its stored responses using
-  // the current reverse-aware, normalized scoring model.
+  // the current normalized scoring model, scored against the question set the
+  // client actually answered (see questionSetVersions.js).
   const answers = getAnswerList(record);
+  const claritySet = getQuestionSetFor(record.date);
   const toolResults = type === 'readiness' && answers.length === readinessQuestions.length
     ? getReadinessResults(answers)
     : type === 'execution' && answers.length === executionQuestions.length
@@ -133,16 +127,17 @@ const RecordDetail = () => {
       : null;
   const hasCompleteClarityResponses = answers.length === clarityQuestions.length;
   const clarityScore = config.hasDimensions
-    ? (hasCompleteClarityResponses ? getClarityScore(answers) : record.score ?? null)
+    ? (hasCompleteClarityResponses ? getClarityScore(answers, claritySet.questions) : record.score ?? null)
     : null;
   const categoryScores = config.hasDimensions
-    ? (hasCompleteClarityResponses ? getCategoryScores(answers) : record.dimScores)
+    ? (hasCompleteClarityResponses ? getCategoryScores(answers, claritySet.questions) : record.dimScores)
     : null;
   const band = config.hasBand ? getScoringBand(clarityScore) : null;
   const position = config.hasDimensions && categoryScores ? getPosition(categoryScores) : null;
   const frictionVector = config.hasDimensions && categoryScores && position ? getFrictionVector(categoryScores, position) : null;
   const growthEdge = config.hasDimensions && categoryScores ? getGrowthEdge(categoryScores) : null;
-  const questions = questionSetByType[type] || [];
+  const questions = type === 'clarity' ? claritySet.questions.map((q) => q.text) : questionSetByType[type] || [];
+  const answerScale = type === 'clarity' ? claritySet.scale : null;
 
   return (
     <div className="record-detail-shell">
@@ -296,7 +291,7 @@ const RecordDetail = () => {
                     <li key={i} className="record-qa-item">
                       <div className="record-qa-question">{qText}</div>
                       <div className="record-qa-answer">
-                        User's choice: <strong>{formatChoice(type, answers[i])}</strong>
+                        User's choice: <strong>{formatChoice(answerScale, answers[i])}</strong>
                       </div>
                     </li>
                   ))}
