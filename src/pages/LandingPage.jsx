@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import HomeClientStories from '../components/HomeClientStories';
 import './LandingPage.css';
 
 const platformCards = [
@@ -29,6 +31,9 @@ const platformCards = [
 ];
 
 const LandingPage = () => {
+  // Only link to the Client Stories page once it has something to show.
+  const [storyCount, setStoryCount] = useState(0);
+
   return (
     <div className="landing-page animate-fade-slide">
       <nav className="tab-nav" aria-label="Assessment platform navigation">
@@ -42,8 +47,13 @@ const LandingPage = () => {
           execution assessment <span className="tab-badge">Week 3</span>
         </Link>
         <Link className="tab-btn" to="/assessment/testimonial">
-          testimonials
+          share your story
         </Link>
+        {storyCount > 0 && (
+          <Link className="tab-btn" to="/client-stories">
+            client stories
+          </Link>
+        )}
       </nav>
 
       <section className="hero landing-hero">
@@ -87,14 +97,7 @@ const LandingPage = () => {
           ))}
         </div>
 
-        <div className="landing-callout">
-          <div>
-            <span>Client Stories</span>
-            <h2>Share your transformation story.</h2>
-            <p>Use the story form after a program or breakthrough moment so testimonials can be reviewed before publishing.</p>
-          </div>
-          <Link to="/assessment?share=story" className="btn btn-primary">Share Your Story</Link>
-        </div>
+        <HomeClientStories onStoriesLoaded={setStoryCount} />
       </section>
     </div>
   );
