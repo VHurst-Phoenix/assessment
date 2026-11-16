@@ -5,6 +5,7 @@ export {
   listAssessments,
   createTestimonial,
   listTestimonials,
+  listPublishedStories,
   updateTestimonialStatus,
   createReadiness,
   listReadiness,

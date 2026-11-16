@@ -234,3 +234,5 @@
     font-size: 0.8rem;
   }
 }
+
+.story-quote { margin: 4px 0 18px; padding: 10px 16px; border-left: 3px solid var(--gold, #d4a056); font-family: Georgia, serif; font-style: italic; font-size: 1.05rem; color: var(--navy, #0d1028); }

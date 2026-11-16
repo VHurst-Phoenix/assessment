@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { createAssessment, createTestimonial } from '../api/dbClient';
+import { createAssessment } from '../api/dbClient';
+import TestimonialForm from '../components/testimonials/TestimonialForm';
 import ReadinessAssessment from './ReadinessAssessment';
 import ExecutionAssessment from './ExecutionAssessment';
 import {
@@ -209,7 +210,7 @@ const AssessmentPage = () => {
           <ClarityAssessment navigate={navigate} />
         </div>
         <div style={{ display: activeTab === 'testimonial' ? 'block' : 'none' }}>
-          <TestimonialForm navigate={navigate} />
+          <TestimonialForm />
         </div>
         <div style={{ display: activeTab === 'readiness' ? 'block' : 'none' }}>
           <ReadinessAssessment />
@@ -322,7 +323,7 @@ const ClarityAssessment = ({ navigate }) => {
     <>
       <div className="hero assessment-hero">
         <div className="hero-label">See It · Phase 1 of 3</div>
-        <h1>The Phoenix<br /><em>Clarity Assessment</em></h1>
+        <h1>The Phoenix{' '}<br /><em>Clarity Assessment</em></h1>
         <p>25 questions. 7 minutes. A clear picture of where you are—and what your next chapter actually requires.</p>
         <div className="hero-meta">
           <span><span className="dot"></span>25 Questions. </span>
@@ -391,7 +392,6 @@ const ClarityAssessment = ({ navigate }) => {
                   <option value="Corporate">Corporate</option>
                   <option value="Federal">Federal</option>
                 </select>
-                <span style={{ fontSize: '0.72rem', color: 'var(--muted)', marginTop: '-4px' }}>Added alongside Affiliation, per the Dashboard Build Spec.</span>
               </div>
             </div>
 
@@ -531,126 +531,6 @@ const ClarityAssessment = ({ navigate }) => {
         </div>
       )}
     </>
-  );
-};
-
-const TestimonialForm = ({ navigate }) => {
-  const [formData, setFormData] = useState({
-    firstName: '', lastName: '', email: '', role: '', segment: '', band: '',
-    before: '', shift: '', after: '', anonymous: 'No', showBand: true
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (isSubmitting) return;
-
-    setIsSubmitting(true);
-    setSubmitError('');
-    const testimonialData = { ...formData, status: 'Pending Review', date: new Date().toISOString() };
-    try {
-      await createTestimonial(testimonialData);
-      alert('Thank you for sharing your story! It is now pending review.');
-      navigate('/client-stories');
-    } catch (err) {
-      console.error("Failed to persist testimonial to Supabase:", err);
-      setSubmitError(err.message || 'Your story could not be saved. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="card intake-card">
-      <h3>Share Your Story</h3>
-      <p style={{ marginBottom: '20px', color: 'var(--muted)' }}>We want to hear about your transformation.</p>
-      <form onSubmit={handleSubmit}>
-        <div className="unified-form unified-testimonial-details">
-          <div className="form-row">
-            <div className="form-group">
-              <label>First Name</label>
-              <input required type="text" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} />
-            </div>
-            <div className="form-group">
-              <label>Last Name</label>
-              <input required type="text" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Email (For follow-up only; never displayed)</label>
-            <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-            <small style={{ color: 'var(--muted)', display: 'block', marginTop: 6 }}>
-              Your email is only used for follow-up and is never shown with your story.
-            </small>
-          </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Role / Profession (Optional)</label>
-                  <input type="text" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} />
-                </div>
-                <div className="form-group">
-                  <label>Clarity Band <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
-                  <select value={formData.band} onChange={e => setFormData({...formData, band: e.target.value})}>
-                    <option value="">Select Band...</option>
-                    <option value="Transitioner">Transitioner</option>
-                    <option value="Strategist">Strategist</option>
-                    <option value="Executor">Executor</option>
-                    <option value="Phoenix">Phoenix</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Segment</label>
-                <select value={formData.segment} onChange={e => setFormData({...formData, segment: e.target.value})}>
-                  <option value="">Select segment...</option>
-                  <option value="Individual">Individual</option>
-                  <option value="Corporate">Corporate</option>
-                  <option value="Federal">Federal</option>
-                </select>
-              </div>
-
-          <div className="form-group">
-            <label>Before (Where were you when you started?)</label>
-            <textarea required rows="3" value={formData.before} onChange={e => setFormData({...formData, before: e.target.value})}></textarea>
-          </div>
-
-          <label className="consent-inline-checkbox" style={{ marginTop: 8 }}>
-            <input type="checkbox" checked={formData.showBand} onChange={e => setFormData({ ...formData, showBand: e.target.checked })} />
-            <span className="consent-inline-checkmark" />
-            <span>Show my Clarity Band with this story if it is published.</span>
-          </label>
-
-          <div className="form-group">
-            <label>The Shift (What changed during the work?)</label>
-            <textarea required rows="3" value={formData.shift} onChange={e => setFormData({...formData, shift: e.target.value})}></textarea>
-          </div>
-
-          <div className="form-group">
-            <label>After (What are you doing now?)</label>
-            <textarea required rows="3" value={formData.after} onChange={e => setFormData({...formData, after: e.target.value})}></textarea>
-          </div>
-
-          <div className="form-group">
-            <label>Display as Anonymous?</label>
-            <select value={formData.anonymous} onChange={e => setFormData({...formData, anonymous: e.target.value})}>
-              <option value="No">No, use my name</option>
-              <option value="Yes">Yes, keep it anonymous</option>
-            </select>
-          </div>
-        </div>
-
-
-        <button type="submit" className="btn btn-gold" style={{ width: '100%', marginTop: 16 }} disabled={isSubmitting}>
-          {isSubmitting ? 'Saving…' : 'Submit Story'}
-        </button>
-        {submitError && <div className="assessment-submit-error" role="alert">{submitError}</div>}
-      </form>
-
-    </div>
   );
 };
 

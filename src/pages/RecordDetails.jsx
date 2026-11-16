@@ -15,6 +15,8 @@ import {
 import { MAX_CATEGORY_SCORE, getCategoryScores, getClarityScore, getScoringBand, getPosition, getFrictionVector, getGrowthEdge } from './scoringBands';
 import { formatPercent, getExecutionResults, getReadinessResults } from './toolScoring';
 import { getQuestionSetFor } from './questionSetVersions';
+import TestimonialDetail from './dashboard/TestimonialDetail';
+import './Dashboard.css';
 import './RecordDetails.css';
 
 const RecordPdfDownload = lazy(() => import('./RecordPdfDownload'));
@@ -170,23 +172,7 @@ const RecordDetail = () => {
         {config.isTestimonial ? (
           <div className="record-section">
             <h3>Story Submission</h3>
-            <dl className="record-kv">
-              <dt>Role / Profession</dt><dd>{record.role || '—'}</dd>
-              <dt>Clarity Band</dt><dd>{record.band || record.stage || '—'}</dd>
-              <dt>Band Source</dt><dd>{record.bandSource || 'self-reported'}</dd>
-              <dt>Segment</dt><dd>{record.segment || '—'}</dd>
-              <dt>Band Display Consent</dt><dd>{record.showBand ? 'Show band' : 'Do not show band'}</dd>
-              <dt>Status</dt><dd>{record.status || '—'}</dd>
-              <dt>Anonymous</dt><dd>{record.anonymous || 'No'}</dd>
-            </dl>
-            <div className="record-story-block">
-              <h4>Before</h4>
-              <p>{record.before}</p>
-              <h4>The Shift</h4>
-              <p>{record.shift}</p>
-              <h4>After</h4>
-              <p>{record.after}</p>
-            </div>
+            <TestimonialDetail story={record} />
           </div>
         ) : (
           <>

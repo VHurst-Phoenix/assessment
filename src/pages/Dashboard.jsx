@@ -22,6 +22,9 @@ import { DATE_RANGES, POSITION_DESCRIPTIONS, getTrajectory, isInDateRange } from
 import PositionMatrix from './dashboard/PositionMatrix';
 import FullResponseRecord from './dashboard/FullResponseRecord';
 import MatchedStories from './dashboard/MatchedStories';
+import TestimonialDetail from './dashboard/TestimonialDetail';
+import { TESTIMONIAL_STATUSES, hasPublishConsent, isFeedbackOnly, placementLabels, testimonialActions } from './testimonialOptions';
+import { toTestimonialExportRow } from '../utils/testimonialExport';
 
 const DownloadFullReport = lazy(() => import('./DownloadFullReport'));
 
@@ -157,7 +160,7 @@ const Dashboard = () => {
     if (activeTab !== 'clarity') return undefined;
     let isMounted = true;
     listTestimonials({ status: 'Approved' })
-      .then((stories) => { if (isMounted) setApprovedTestimonials(stories || []); })
+      .then((stories) => { if (isMounted) setApprovedTestimonials((stories || []).filter((story) => hasPublishConsent(story) && !isFeedbackOnly(story.engagementType))); })
       .catch((err) => { if (isMounted) setError(err.message || 'Unable to load testimonial matches.'); });
     return () => { isMounted = false; };
   }, [activeTab]);
@@ -240,7 +243,7 @@ const Dashboard = () => {
     setIsExporting(true); setError('');
     try {
       const scope = [activeTab, selectedSegment || 'all', selectedStatus || 'records'].join('_').replace(/\s+/g, '-').toLowerCase();
-      const rows = activeTab === 'clarity' ? filteredData.map(toClarityExportRow) : filteredData;
+      const rows = activeTab === 'clarity' ? filteredData.map(toClarityExportRow) : activeTab === 'testimonials' ? filteredData.map(toTestimonialExportRow) : filteredData;
       downloadCsv(rows, `Phoenix_${scope}_${new Date().toISOString().slice(0, 10)}.csv`);
     } catch (err) { console.error(err); setError(err.message || 'Unable to export the current view.'); } finally { setIsExporting(false); }
   };
@@ -293,7 +296,7 @@ const Dashboard = () => {
           <label className="dashboard-search" htmlFor="dashboard-search"><span className="sr-only">Search records</span><span aria-hidden="true">⌕</span><input id="dashboard-search" type="search" value={search} onChange={updateFilter(setSearch)} placeholder="Search name, email, company…" /></label>
           <label className="dashboard-select-label" htmlFor="dashboard-date"><span>Date range</span><select id="dashboard-date" value={dateRange} onChange={updateFilter(setDateRange)}>{DATE_RANGES.map((range) => <option key={range.value} value={range.value}>{range.label}</option>)}</select></label>
           <label className="dashboard-select-label" htmlFor="dashboard-segment"><span>Segment</span><select id="dashboard-segment" value={selectedSegment} onChange={updateFilter(setSelectedSegment)}><option value="">All segments</option><option value="Federal">Federal</option><option value="Corporate">Corporate</option><option value="Individual">Individual</option><option value="Unset">Unset</option></select></label>
-          <label className="dashboard-select-label" htmlFor="dashboard-status"><span>{activeTab === 'testimonials' ? 'Status' : 'Band'}</span><select id="dashboard-status" value={selectedStatus} onChange={updateFilter(setSelectedStatus)}><option value="">{activeTab === 'testimonials' ? 'All statuses' : 'All bands'}</option>{activeTab === 'testimonials' ? ['Pending Review', 'Approved', 'Rejected'].map((status) => <option key={status} value={status}>{status}</option>) : bandOptions.map((band) => <option key={band} value={band}>{band}</option>)}</select></label>
+          <label className="dashboard-select-label" htmlFor="dashboard-status"><span>{activeTab === 'testimonials' ? 'Status' : 'Band'}</span><select id="dashboard-status" value={selectedStatus} onChange={updateFilter(setSelectedStatus)}><option value="">{activeTab === 'testimonials' ? 'All statuses' : 'All bands'}</option>{activeTab === 'testimonials' ? TESTIMONIAL_STATUSES.map((status) => <option key={status} value={status}>{status}</option>) : bandOptions.map((band) => <option key={band} value={band}>{band}</option>)}</select></label>
           <label className="dashboard-select-label dashboard-sort-label" htmlFor="dashboard-sort"><span>Sort</span><select id="dashboard-sort" value={sort} onChange={updateFilter(setSort)}><option value="date-desc">Newest first</option><option value="name-asc">Name A–Z</option>{activeTab !== 'testimonials' && <><option value="score-desc">Highest score</option><option value="score-asc">Lowest score</option></>}</select></label>
           <button type="button" className="dashboard-refresh" onClick={loadData} disabled={isLoading} aria-label="Refresh records"><span aria-hidden="true">↻</span> {isLoading ? 'Refreshing' : 'Refresh'}</button>
           <p className="dashboard-filter-note">Export respects these filters.</p>
@@ -310,7 +313,7 @@ const Dashboard = () => {
                 {activeTab === 'clarity' && <><th>Band</th><th>Position</th><th>Friction Vector</th><th>Growth Edge</th></>}
                 {activeTab === 'execution' && <><th>Checkpoint</th><th>Band</th><th>Execution Gap</th><th>Trajectory</th></>}
                 {activeTab === 'readiness' && <><th>Band</th><th>Readiness Gap</th><th>Trajectory</th></>}
-                {activeTab === 'testimonials' && <><th>Status</th><th>Matched Band</th></>}
+                {activeTab === 'testimonials' && <><th>Status</th><th>Type</th><th>Matched Band</th><th>May appear in</th></>}
                 <th><span className="sr-only">Actions</span></th>
               </tr></thead>
               <tbody>
@@ -326,7 +329,7 @@ const Dashboard = () => {
                       {activeTab === 'clarity' && <><td><BandPill record={item} tab={activeTab} /></td><td className="signal-text">{signals?.position?.quadrant || '—'}</td><td className="signal-text">{signals?.frictionVector?.archetype || '—'}</td><td className="signal-text growth-text">{signals?.growthEdge ? dimLabels[signals.growthEdge.index] : '—'}</td></>}
                       {activeTab === 'execution' && <><td>{item.programCheckpoint || '—'}</td><td><BandPill record={item} tab={activeTab} /></td><td className="signal-text">{item.gap || '—'}</td><td><TrajectoryTag trajectory={trajectories[item.id]} /></td></>}
                       {activeTab === 'readiness' && <><td><BandPill record={item} tab={activeTab} /></td><td className="signal-text">{item.gap || '—'}</td><td><TrajectoryTag trajectory={trajectories[item.id]} /></td></>}
-                      {activeTab === 'testimonials' && <><td><span className={`status-pill ${statusClass(item.status)}`}>{item.status || 'Unknown'}</span></td><td className="signal-text">{item.band || '—'} {item.band && <span className={`source-tag ${item.bandSource === 'verified' ? 'source-verified' : 'source-self'}`}>{item.bandSource || 'self-reported'}</span>}</td></>}
+                      {activeTab === 'testimonials' && <><td><span className={`status-pill ${statusClass(item.status)}`}>{item.status || 'Unknown'}</span></td><td className="signal-text">{!hasPublishConsent(item) ? 'No consent' : isFeedbackOnly(item.engagementType) ? 'Feedback' : 'Testimonial'}</td><td className="signal-text">{item.band || '—'} {item.band && <span className={`source-tag ${item.bandSource === 'verified' ? 'source-verified' : 'source-self'}`}>{item.bandSource || 'self-reported'}</span>}</td><td className="signal-text">{placementLabels(item.permittedUses).join(', ') || '—'}</td></>}
                       <td><Link to={`/dashboard/record/${activeTab}/${item.id}`} className="table-open-link" onClick={(event) => event.stopPropagation()} aria-label={`Open ${getName(item)} details`}>Open</Link></td>
                     </tr>
                   );
@@ -370,13 +373,13 @@ const Dashboard = () => {
                 <section className="focus-section"><h3>Full response record</h3><FullResponseRecord key={selectedRecord.id} type={activeTab} record={selectedRecord} /></section>
               </>}
 
-              {activeTab === 'testimonials' && <><div className="focus-output-grid"><div><span>Status</span><strong>{selectedRecord.status || '—'}</strong></div><div><span>Band</span><strong>{selectedRecord.band || '—'}</strong></div><div><span>Source</span><strong>{selectedRecord.bandSource || 'Self-reported'}</strong></div><div><span>Segment</span><strong>{selectedRecord.segment || 'Unset'}</strong></div></div><section className="story-preview"><div><span>Before</span><p>{selectedRecord.before || 'No response provided.'}</p></div><div><span>The shift</span><p>{selectedRecord.shift || 'No response provided.'}</p></div><div><span>After</span><p>{selectedRecord.after || 'No response provided.'}</p></div></section></>}
+              {activeTab === 'testimonials' && <TestimonialDetail story={selectedRecord} />}
 
               <div className="focus-actions">
                 {activeTab === 'clarity' && <Suspense fallback={<span className="btn btn-gold">Preparing report…</span>}><DownloadFullReport key={selectedRecord.id} record={selectedRecord} /></Suspense>}
                 <Link to={`/dashboard/record/${activeTab}/${selectedRecord.id}`} className="btn btn-primary">{activeTab === 'clarity' ? 'Open record · store & release report' : 'View full record'}</Link>
                 {activeTab !== 'testimonials' && <a href={ACUITY_APPOINTMENTS_URL} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">📅 View booking</a>}
-                {activeTab === 'testimonials' && selectedRecord.status === 'Pending Review' && <><button type="button" className="focus-approve" onClick={() => updateTestimonial(selectedRecord.id, 'Approved')}>Approve</button><button type="button" className="focus-reject" onClick={() => updateTestimonial(selectedRecord.id, 'Rejected')}>Reject</button></>}
+                {activeTab === 'testimonials' && testimonialActions(selectedRecord).map((action) => <button type="button" key={action.status} className={action.tone === 'approve' ? 'focus-approve' : 'focus-reject'} onClick={() => updateTestimonial(selectedRecord.id, action.status)}>{action.label}</button>)}
               </div>
               <div className="focus-danger-zone">{confirmDeleteId === selectedRecord.id ? <><span>Delete this record?</span><button type="button" onClick={() => deleteItemHandler(selectedRecord.id)}>Yes, delete</button><button type="button" onClick={() => setConfirmDeleteId(null)}>Cancel</button></> : <button type="button" onClick={() => setConfirmDeleteId(selectedRecord.id)}>Delete record</button>}</div>
             </div>

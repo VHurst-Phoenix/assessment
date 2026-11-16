@@ -118,10 +118,25 @@ export function mapTestimonial(row) {
     matchedAssessmentId: row.matched_assessment_id,
     beforeBand: row.before_band,
     afterBand: row.after_band,
+    selfBandStart: row.self_band_start,
+    selfBandNow: row.self_band_now,
     before: row.before,
     shift: row.shift,
     after: row.after,
+    quote: row.quote,
+    engagementType: row.engagement_type,
+    nameDisplay: row.name_display || (row.anonymous === 'Yes' ? 'anonymous' : row.name_display),
+    permittedUses: Array.isArray(row.permitted_uses) ? row.permitted_uses : [],
+    editChoice: row.edit_choice,
+    storyCallRequest: row.story_call_request === true,
+    consentTimestamp: row.consent_timestamp,
+    consentVersion: row.consent_version,
     status: row.status,
+    statusChangedAt: row.status_changed_at,
+    approvedAt: row.approved_at,
+    rejectedAt: row.rejected_at,
+    removalRequestedAt: row.removal_requested_at,
+    removedAt: row.removed_at,
     date: row.created_at,
   };
 }
@@ -179,15 +194,6 @@ export function mapExecutionForm(row) {
 const OPTIONAL_ASSESSMENT_COLUMNS = ['raw_score', 'dim_scores'];
 // These were added after the original client-stories table. Keeping them
 // optional lets the form work while an older hosted schema is being migrated.
-const OPTIONAL_TESTIMONIAL_COLUMNS = [
-  'segment',
-  'band',
-  'band_source',
-  'show_band',
-  'matched_assessment_id',
-  'before_band',
-  'after_band',
-];
 
 function assessmentRow(payload, omittedColumns = new Set()) {
   const row = {
@@ -259,40 +265,31 @@ function executionFormRow(payload) {
   };
 }
 
-function testimonialRow(payload, omittedColumns = new Set()) {
-  const band = payload.band?.trim() || null;
-
-  const row = {
+// Share Your Story v1.2. Band, matching, status, timestamps and `anonymous`
+// are set by the database trigger (testimonial_before_insert), never here.
+function testimonialRow(payload) {
+  const trimOrNull = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
+  return {
     first_name: payload.firstName?.trim(),
     last_name: payload.lastName?.trim(),
     email: payload.email?.trim().toLowerCase(),
-    role: payload.role?.trim() || null,
-    anonymous: payload.anonymous === 'Yes' ? 'Yes' : 'No',
-    // A browser submission cannot safely read assessment history, so this is
-    // explicitly self-reported instead of being marked as verified.
-    stage: band,
+    role: trimOrNull(payload.role),
+    segment: trimOrNull(payload.segment),
+    engagement_type: payload.engagementType,
+    self_band_start: trimOrNull(payload.selfBandStart),
+    self_band_now: trimOrNull(payload.selfBandNow),
     before: payload.before?.trim(),
     shift: payload.shift?.trim(),
     after: payload.after?.trim(),
-    status: payload.status ?? 'Pending Review',
-    created_at: payload.date ?? new Date().toISOString(),
+    quote: payload.quote?.trim(),
+    name_display: payload.nameDisplay,
+    permitted_uses: Array.isArray(payload.permittedUses) ? payload.permittedUses : [],
+    edit_choice: payload.editChoice,
+    story_call_request: payload.storyCallRequest === true,
+    show_band: payload.showBand === true,
+    consent_timestamp: payload.consentTimestamp,
+    consent_version: payload.consentVersion,
   };
-
-  const matchingFields = {
-    segment: payload.segment?.trim() || null,
-    band,
-    band_source: 'self-reported',
-    show_band: payload.showBand !== false,
-    matched_assessment_id: null,
-    before_band: null,
-    after_band: band,
-  };
-
-  for (const [column, value] of Object.entries(matchingFields)) {
-    if (!omittedColumns.has(column)) row[column] = value;
-  }
-
-  return row;
 }
 
 export async function createAssessment(payload, { signal } = {}) {
@@ -397,38 +394,40 @@ export async function fetchAllRows(tableName, { orderBy = 'created_at', ascendin
 
 export async function createTestimonial(payload) {
   const supabase = assertSupabaseClient();
-
-  const insertTestimonial = (row) => supabase
-    .from(env.supabaseTestimonialsTable)
-    .insert(row);
-
   try {
-    const omittedColumns = new Set();
-    let data;
-    let error;
-
-    while (true) {
-      ({ data, error } = await withTimeout(insertTestimonial(testimonialRow(payload, omittedColumns)), 30000));
-
-      if (!error) break;
-
-      const missingColumn = OPTIONAL_TESTIMONIAL_COLUMNS.find(
-        (column) => !omittedColumns.has(column) && isMissingColumnError(error, column)
-      );
-
-      if (!missingColumn) break;
-
-      omittedColumns.add(missingColumn);
-      console.warn(`[supabaseRestClient] Supabase testimonials table is missing ${missingColumn} column. Retrying testimonial insert without it.`, {
-        originalError: error?.message,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    handleSupabaseError(error, 'Failed to create testimonial.');
-    return mapTestimonial(data);
+    // No column-dropping retry here: consent fields must never be silently
+    // omitted. If the v1.2 migration is missing, the submission fails loudly.
+    const { error } = await withTimeout(
+      supabase.from(env.supabaseTestimonialsTable).insert(testimonialRow(payload)),
+      30000,
+    );
+    handleSupabaseError(error, 'Your story could not be saved. Please try again.');
+    return { saved: true };
   } catch (err) {
-    handleSupabaseError(err, 'Failed to create testimonial.');
+    handleSupabaseError(err, 'Your story could not be saved. Please try again.');
+  }
+}
+
+// Public Client Stories page: approved, consented stories cleared for the
+// placement, with only the fields the public card may show.
+export async function listPublishedStories(placement = 'client_stories') {
+  const supabase = assertSupabaseClient();
+  try {
+    const { data, error } = await supabase.rpc('get_published_stories', { placement });
+    handleSupabaseError(error, 'Failed to load client stories.');
+    return (data || []).map((row) => ({
+      id: row.id,
+      displayName: row.display_name,
+      role: row.role,
+      before: row.before,
+      shift: row.shift,
+      after: row.after,
+      quote: row.quote,
+      band: row.band,
+      approvedAt: row.approved_at,
+    }));
+  } catch (err) {
+    handleSupabaseError(err, 'Failed to load client stories.');
   }
 }
 
